@@ -1,0 +1,49 @@
+ID,Požiadavka,Rola,MoSCoW
+,Správa používateľských účtov a autentifikácia,,
+FR-001,"Systém musí umožniť používateľovi registráciu, bezpečné prihlásenie a správu profilu s atribútmi: prihlasovacie meno, e-mail, heslo a preferovaná mena (EUR, USD).",Zberateľ,M
+FR-002,"Systém by mal umožniť dvojfaktorovú autentifikáciu (2FA) a obnovu prístupu k účtu prostredníctvom jednorazového overovacieho odkazu na e-mail.",Zberateľ,S
+FR-003,"Systém by mohol umožniť prihlásenie prostredníctvom externých poskytovateľov identity (OAuth 2.0 – Google, Apple ID).",Zberateľ,C
+FR-004,"Systém nebude v prvej verzii podporovať zdieľanie jedného zberateľského účtu medzi viacerými nezávislými používateľmi súčasne (multi-user prístup k zbierke).",Zberateľ,W
+,,,
+,Správa zberateľského portfólia a evidencia predmetov,,
+FR-005,"Systém musí umožniť evidovať predmety v zbierke s atribútmi: názov, kategória, stav predmetu (napr. nový, rozbalený, poškodený), dátum nadobudnutia, nákupná cena a poznámka.",Zberateľ,M
+FR-006,"Systém by mal umožniť organizovať zbierku do vlastných podkategórií, sérií a štítkov (tagov) a filtrovať či triediť položky podľa hodnoty, názvu a dátumu pridania.",Zberateľ,S
+FR-007,"Systém by mohol umožniť export celého portfólia do formátov PDF a CSV pre účely poistenia zbierky, tlače alebo archivácie.",Zberateľ,C
+FR-008,"Systém nebude umožňovať priamy nákup a predaj predmetov medzi používateľmi formou vstavaného aukčného portálu alebo peer-to-peer e-shopu.",Zberateľ,W
+,,,
+,Integrácia s externými API a obohacovanie dát,,
+FR-009,"Systém musí na základe zadania názvu, kódu alebo identifikátora predmetu automaticky doplniť oficiálne metadáta a fotografie z verejných API bez nutnosti manuálneho vypisovania údajov.",Zberateľ,M
+FR-010,"Systém by mal umožniť používateľovi manuálne prepísať alebo doplniť automaticky načítané metadáta a pridať vlastné autentické fotografie reálneho stavu predmetu.",Zberateľ,S
+FR-011,"Systém by mohol podporovať automatické rozpoznanie predmetu a vyhľadanie v API naskenovaním čiarového kódu (EAN/UPC) kamerou mobilného zariadenia.",Zberateľ,C
+FR-012,"Systém nebude podporovať generovanie umelej 3D vizualizácie predmetu pomocou generatívnych modelov pri chýbajúcich fotografiách v API.",Zberateľ,W
+,,,
+,Analýza a sledovanie vývoja trhových cien,,
+FR-013,"Systém musí evidovať a vizualizovať vývoj trhových cien evidovaných predmetov v čase formou interaktívneho cenového grafu a histórie zmien.",Zberateľ,M
+FR-014,"Systém by mal automaticky prepočítavať a zobrazovať percentuálny aj absolútny zisk/stratu (ROI) každého predmetu a celého portfólia voči nákupnej cene.",Zberateľ,S
+FR-015,"Systém by mohol na základe štatistickej analýzy historických cien predikovať krátkodobý cenový vývoj a odporúčať optimálny čas na nákup či predaj.",Zberateľ,C
+FR-016,"Systém nebude poskytovať licencované a právne záväzné finančné ani investičné poradenstvo podľa bankových regulácií.",Zberateľ,W
+,,,
+,Autonómny monitorovací skript (bot) a skenovanie trhovísk,,
+FR-017,"Systém musí autonómne a nepretržite skenovať online trhoviská (napr. Vinted) a vyhľadávať nové inzeráty na základe zadaných kľúčových slov, kategórií a cenových stropov.",Zberateľ,M
+FR-018,"Systém by mal umožniť používateľovi nastaviť podrobné parametre vyhľadávania vrátane vylučovacích slov, požadovaného stavu tovaru a minimálneho hodnotenia predajcu.",Zberateľ,S
+FR-019,"Systém by mohol automaticky detegovať duplicitné alebo podozrivo lacné inzeráty pomocou porovnávania parametrov a metadát zverejnených fotografií.",Zberateľ,C
+FR-020,"Systém nebude vykonávať automatizované nakupovanie tovaru ani automatické odosielanie platieb na monitorovaných bazároch bez manuálneho schválenia používateľom.",Zberateľ,W
+,,,
+,Notifikačný systém a automatické pridávanie do zbierky,,
+FR-021,"Systém musí pri detekcii nového zodpovedajúceho inzerátu vygenerovať interaktívnu notifikáciu obsahujúcu názov, cenu, fotografiu a priamy odkaz na inzerát.",Zberateľ,M
+FR-022,"Systém musí po interakcii používateľa s interaktívnou notifikáciou (potvrdenie pridania) automaticky zapísať predmet do databázy používateľa a okamžite prepočítať celkovú hodnotu zbierky.",Zberateľ,M
+FR-023,"Systém by mal podporovať viacero notifikačných kanálov (mobilné push notifikácie, webové notifikácie a e-mailové upozornenia) s možnosťou nastavenia ich frekvencie.",Zberateľ,S
+FR-024,"Systém by mohol umožniť odosielanie notifikácií a rýchle pridanie predmetu prostredníctvom externých komunikačných botov (napr. Telegram alebo Discord).",Zberateľ,C
+FR-025,"Systém nebude odosielať notifikácie prostredníctvom platených SMS správ ani automatických telefonických hovorov.",Zberateľ,W
+,,,
+,Používateľské rozhrania a synchronizácia,,
+FR-026,"Systém musí poskytovať plnohodnotné webové rozhranie aj mobilné rozhranie s okamžitou synchronizáciou zberateľských dát medzi zariadeniami.",Zberateľ,M
+FR-027,"Systém by mal podporovať responzívne zobrazenie optimalizované pre tablety a možnosť prepnutia medzi svetlým a tmavým grafickým motívom (Dark Mode).",Zberateľ,S
+FR-028,"Systém by mohol umožniť lokálne cachovanie dát pre offline prehliadanie zbierky v mobilnom rozhraní bez aktívneho pripojenia k internetu.",Zberateľ,C
+FR-029,"Systém nebude vyvíjaný ako natívna desktopová aplikácia pre platformy Windows, macOS a Linux.",Zberateľ,W
+,,,
+,Administrácia systému a správa scraperov,,
+FR-030,"Systém musí umožniť administrátorovi monitorovať prevádzkový stav scraper botov, konfigurovať kľúče k externým API a prezerať chybové systémové logy.",Administrátor,M
+FR-031,"Systém by mal umožniť administrátorovi nastavovať frekvenciu dopytovania a limity rýchlosti (rate limits) pre jednotlivé trhoviská s cieľom predísť blokovaniu IP adries.",Administrátor,S
+FR-032,"Systém by mohol poskytovať administrátorovi štatistický dashboard s metrikami o počte spracovaných inzerátov, vygenerovaných notifikácií a aktívnych používateľov.",Administrátor,C
+FR-033,"Systém nebude umožňovať administrátorovi prístup k nezašifrovaným heslám používateľov ani zasahovať do obsahu ich súkromných zbierok bez ich súhlasu.",Administrátor,W
