@@ -1,7 +1,14 @@
-# Závislosti pre ročníkový projekt Zbierka
-# Základné moduly využívajú štandardnú knižnicu Python 3.9+
-# Pre rozšírenú produkčnú verziu:
+# Závislosti pre ročníkový projekt Zbierka (Portfólio + Vinted Snajper Bot)
+
+# Základné knižnice pre aplikáciu a portfólio
 requests>=2.28.0
 urllib3>=1.26.0
-dataclasses;python_version<'3.7'
 pytest>=7.0.0
+
+# Knižnice pre autonómneho bota (Vinted Snajper) a Dashboard
+playwright>=1.44.0
+playwright-stealth>=1.0.6
+httpx>=0.27.0
+python-dotenv>=1.0.0
+flask>=3.0.0
+psutil>=5.9.0
