@@ -1,0 +1,7 @@
+# Závislosti pre ročníkový projekt Zbierka
+# Základné moduly využívajú štandardnú knižnicu Python 3.9+
+# Pre rozšírenú produkčnú verziu:
+requests>=2.28.0
+urllib3>=1.26.0
+dataclasses;python_version<'3.7'
+pytest>=7.0.0

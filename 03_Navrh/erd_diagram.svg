@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 680" width="100%" height="100%">
+  <defs>
+    <style>
+      .title { font-family: system-ui, -apple-system, sans-serif; font-size: 20px; font-weight: bold; fill: #1f4e79; }
+      .tbl-header { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; font-weight: bold; fill: #ffffff; }
+      .tbl-field { font-family: monospace, sans-serif; font-size: 11px; fill: #1f2937; }
+      .tbl-type { font-family: monospace, sans-serif; font-size: 10px; fill: #6b7280; text-anchor: end; }
+      .pk { font-weight: bold; fill: #b91c1c; }
+      .fk { font-weight: bold; fill: #2563eb; }
+      .conn { stroke: #64748b; stroke-width: 1.5; fill: none; }
+      .conn-dash { stroke: #eab308; stroke-width: 2; stroke-dasharray: 4,4; fill: none; }
+    </style>
+  </defs>
+
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  <text x="30" y="38" class="title">ERD – Návrh dátových štruktúr systému Zbierka</text>
+  <text x="30" y="58" font-family="sans-serif" font-size="12" fill="#64748b">Relačný model pre správu portfólia, scraping bota a interaktívne notifikácie</text>
+
+  <!-- TABLE: users -->
+  <g transform="translate(40, 90)">
+    <rect width="210" height="155" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <rect width="210" height="28" rx="6" fill="#1f4e79"/>
+    <text x="10" y="19" class="tbl-header">users (Používatelia)</text>
+    <text x="10" y="46" class="tbl-field pk">id : UUID [PK]</text>
+    <text x="10" y="64" class="tbl-field">username : VARCHAR(50)</text>
+    <text x="10" y="82" class="tbl-field">email : VARCHAR(255)</text>
+    <text x="10" y="100" class="tbl-field">password_hash : VARCHAR</text>
+    <text x="10" y="118" class="tbl-field">role : VARCHAR(20)</text>
+    <text x="10" y="136" class="tbl-field">currency : VARCHAR(3)</text>
+  </g>
+
+  <!-- TABLE: categories -->
+  <g transform="translate(360, 90)">
+    <rect width="210" height="120" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <rect width="210" height="28" rx="6" fill="#334155"/>
+    <text x="10" y="19" class="tbl-header">categories (Kategórie)</text>
+    <text x="10" y="46" class="tbl-field pk">id : BIGINT [PK]</text>
+    <text x="10" y="64" class="tbl-field">name : VARCHAR(100)</text>
+    <text x="10" y="82" class="tbl-field fk">parent_id : BIGINT [FK]</text>
+    <text x="10" y="100" class="tbl-field">api_provider : VARCHAR(50)</text>
+  </g>
+
+  <!-- TABLE: items -->
+  <g transform="translate(360, 270)">
+    <rect width="250" height="210" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+    <rect width="250" height="28" rx="6" fill="#2563eb"/>
+    <text x="10" y="19" class="tbl-header">items (Zberateľské predmety)</text>
+    <text x="10" y="46" class="tbl-field pk">id : UUID [PK]</text>
+    <text x="10" y="64" class="tbl-field fk">user_id : UUID [FK]</text>
+    <text x="10" y="82" class="tbl-field fk">category_id : BIGINT [FK]</text>
+    <text x="10" y="100" class="tbl-field">name : VARCHAR(255)</text>
+    <text x="10" y="118" class="tbl-field">condition : VARCHAR(50)</text>
+    <text x="10" y="136" class="tbl-field">purchase_price : NUMERIC</text>
+    <text x="10" y="154" class="tbl-field">estimated_value : NUMERIC</text>
+    <text x="10" y="172" class="tbl-field">external_api_id : VARCHAR</text>
+    <text x="10" y="190" class="tbl-field fk">source_listing_id : BIGINT [FK]</text>
+  </g>
+
+  <!-- TABLE: price_history -->
+  <g transform="translate(40, 310)">
+    <rect width="210" height="120" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <rect width="210" height="28" rx="6" fill="#475569"/>
+    <text x="10" y="19" class="tbl-header">price_history (Ceny)</text>
+    <text x="10" y="46" class="tbl-field pk">id : BIGINT [PK]</text>
+    <text x="10" y="64" class="tbl-field fk">item_id : UUID [FK]</text>
+    <text x="10" y="82" class="tbl-field">recorded_price : NUMERIC</text>
+    <text x="10" y="100" class="tbl-field">recorded_at : TIMESTAMP</text>
+  </g>
+
+  <!-- TABLE: bot_filters -->
+  <g transform="translate(710, 90)">
+    <rect width="240" height="155" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <rect width="240" height="28" rx="6" fill="#0f766e"/>
+    <text x="10" y="19" class="tbl-header">bot_filters (Pravidlá bota)</text>
+    <text x="10" y="46" class="tbl-field pk">id : BIGINT [PK]</text>
+    <text x="10" y="64" class="tbl-field fk">user_id : UUID [FK]</text>
+    <text x="10" y="82" class="tbl-field">keywords : VARCHAR(255)</text>
+    <text x="10" y="100" class="tbl-field">max_price : NUMERIC</text>
+    <text x="10" y="118" class="tbl-field">exclude_words : VARCHAR</text>
+    <text x="10" y="136" class="tbl-field">target_market : VARCHAR</text>
+  </g>
+
+  <!-- TABLE: marketplace_listings -->
+  <g transform="translate(710, 310)">
+    <rect width="240" height="155" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <rect width="240" height="28" rx="6" fill="#b45309"/>
+    <text x="10" y="19" class="tbl-header">marketplace_listings</text>
+    <text x="10" y="46" class="tbl-field pk">id : BIGINT [PK]</text>
+    <text x="10" y="64" class="tbl-field">external_id : VARCHAR(100)</text>
+    <text x="10" y="82" class="tbl-field">title : VARCHAR(255)</text>
+    <text x="10" y="100" class="tbl-field">price : NUMERIC(10,2)</text>
+    <text x="10" y="118" class="tbl-field">listing_url : TEXT</text>
+    <text x="10" y="136" class="tbl-field">photo_url : TEXT</text>
+  </g>
+
+  <!-- TABLE: notifications -->
+  <g transform="translate(540, 520)">
+    <rect width="250" height="135" rx="6" fill="#fefce8" stroke="#ca8a04" stroke-width="2"/>
+    <rect width="250" height="28" rx="6" fill="#ca8a04"/>
+    <text x="10" y="19" class="tbl-header">notifications (Interaktívne notif.)</text>
+    <text x="10" y="46" class="tbl-field pk">id : BIGINT [PK]</text>
+    <text x="10" y="64" class="tbl-field fk">user_id : UUID [FK]</text>
+    <text x="10" y="82" class="tbl-field fk">listing_id : BIGINT [FK]</text>
+    <text x="10" y="100" class="tbl-field">status : PENDING / ACCEPTED</text>
+    <text x="10" y="118" class="tbl-field">action_taken_at : TIMESTAMP</text>
+  </g>
+
+  <!-- Relationships Lines -->
+  <!-- users -> items -->
+  <path d="M 250 160 L 305 160 L 305 340 L 360 340" class="conn"/>
+  <!-- categories -> items -->
+  <path d="M 465 210 L 465 270" class="conn"/>
+  <!-- items -> price_history -->
+  <path d="M 360 370 L 250 370" class="conn"/>
+  <!-- users -> bot_filters -->
+  <path d="M 250 130 L 710 130" class="conn"/>
+  <!-- bot_filters -> listings -->
+  <path d="M 830 245 L 830 310" class="conn"/>
+  <!-- listings -> notifications -->
+  <path d="M 800 465 L 800 580 L 790 580" class="conn"/>
+  <!-- notifications -> items (Auto-add) -->
+  <path d="M 540 560 L 485 560 L 485 480" class="conn-dash"/>
+  <text x="495" y="545" font-family="sans-serif" font-size="11" font-weight="bold" fill="#b45309">Auto-Add</text>
+
+</svg>

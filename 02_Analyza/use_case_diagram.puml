@@ -1,0 +1,47 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam handwritten false
+skinparam defaultFontName "Helvetica, Arial, sans-serif"
+
+actor "Návštevník" as Guest #E1F5FE
+actor "Zberateľ" as Collector #BBDEFB
+actor "Administrátor" as Admin #FFE0B2
+
+actor "Verejné API" as Api << External >> #E0E0E0
+actor "Online Trhovisko\n(Vinted)" as Market << External >> #E0E0E0
+
+rectangle "Systém Zbierka" {
+  usecase "UC-001: Registruj a prihlás zberateľa" as UC1
+  usecase "UC-002: Pridaj predmet s metadátami" as UC2
+  usecase "UC-003: Zobraz vývoj trhových cien" as UC3
+  usecase "UC-004: Nastav monitorovacieho bota" as UC4
+  usecase "UC-005: Pridaj nájdený predmet z notifikácie\n(Kľúčová vlastnosť)" as UC5 #FFF9C4
+  usecase "UC-006: Spravuj scrapery a systém" as UC6
+  
+  usecase "Over dostupnosť inzerátu" as SubCheck
+  usecase "Prepočítaj celkovú hodnotu zbierky" as SubCalc #FFF59D
+  usecase "Stiahni oficiálne foto a metadáta" as SubApi
+}
+
+Guest --> UC1
+
+Collector --> UC1
+Collector --> UC2
+Collector --> UC3
+Collector --> UC4
+Collector --> UC5
+
+Admin --> UC6
+
+UC2 ..> SubApi : <<include>>
+SubApi --> Api
+
+UC5 ..> SubCalc : <<include>>
+UC5 ..> SubCheck : <<include>>
+Market --> UC5 : detegovaný inzerát
+
+UC4 ..> Market : konfiguruje cieľ
+
+@enduml
