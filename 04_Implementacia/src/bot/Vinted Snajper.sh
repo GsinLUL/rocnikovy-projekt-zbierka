@@ -1,0 +1,1 @@
+python3 /Users/maxim/Documents/vinted-bot/dashboard.py
