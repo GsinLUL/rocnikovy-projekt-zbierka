@@ -181,96 +181,344 @@ async function deleteItem(id) {
   }
 }
 
-// ── 5. Vinted Snajper Feed & KĽÚČOVÉ AUTOMATICKÉ PRIDÁVANIE ────────────────
+// ── 5. Vinted Snajper Feed, Dynamické Časy & Telegram Integrácia ─────────
+let currentVintedCategory = "all";
+let currentVintedQuery = "";
+let currentVintedSort = "newest";
+let vintedSearchTimeout = null;
+let liveStreamCountdown = 6;
+let latestListingId = null;
+
 function initVintedFeed() {
-  const vintedFilter = document.getElementById("vinted-search-filter");
-  if (vintedFilter) {
-    vintedFilter.addEventListener("change", () => {
-      loadVintedListings(vintedFilter.value);
+  // 1. Vyhľadávacie pole v zachytených inzerátoch
+  const searchInput = document.getElementById("vinted-search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      clearTimeout(vintedSearchTimeout);
+      vintedSearchTimeout = setTimeout(() => {
+        currentVintedQuery = searchInput.value.trim();
+        loadVintedListings();
+      }, 250);
     });
+  }
+
+  // 2. Počiatočné načítanie inzerátov
+  loadVintedListings();
+
+  // 3. Živý ticker pre odpočítavanie sekúnd ("pred X sekundami") - každú 1 sekundu!
+  setInterval(updateLiveTimestamps, 1000);
+
+  // 4. Periodické overovanie nových inzerátov (živý radarový stream každých 6 sekúnd)
+  setInterval(pollNewVintedListings, 6000);
+}
+
+// Dynamický výpočet relatívneho času v prirodzenej slovenčine
+function formatRelativeTime(timestampMs) {
+  if (!timestampMs) return "nedávno";
+  const now = Date.now();
+  const diffSec = Math.max(0, Math.floor((now - timestampMs) / 1000));
+
+  if (diffSec < 4) {
+    return "práve teraz";
+  }
+  if (diffSec < 60) {
+    if (diffSec === 1) return "pred 1 sekundou";
+    if (diffSec >= 2 && diffSec <= 4) return `pred ${diffSec} sekundami`;
+    return `pred ${diffSec} sekundami`;
+  }
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    if (diffMin === 1) return "pred 1 minútou";
+    if (diffMin >= 2 && diffMin <= 4) return `pred ${diffMin} minútami`;
+    return `pred ${diffMin} minútami`;
+  }
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) {
+    if (diffHours === 1) return "pred 1 hodinou";
+    if (diffHours >= 2 && diffHours <= 4) return `pred ${diffHours} hodinami`;
+    return `pred ${diffHours} hodinami`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return "pred 1 dňom";
+  if (diffDays >= 2 && diffDays <= 4) return `pred ${diffDays} dňami`;
+  return `pred ${diffDays} dňami`;
+}
+
+// Funkcia prechodu všetkých zobrazených kariet a aktualizáciu textu času
+function updateLiveTimestamps() {
+  const badges = document.querySelectorAll(".vinted-time-badge");
+  badges.forEach(badge => {
+    const ts = parseInt(badge.getAttribute("data-ts"), 10);
+    if (ts) {
+      const textSpan = badge.querySelector(".time-text");
+      if (textSpan) {
+        textSpan.textContent = formatRelativeTime(ts);
+      }
+    }
+  });
+
+  // Odpočítavanie pre indikátor streamu
+  const timerText = document.getElementById("live-timer-text");
+  if (timerText) {
+    liveStreamCountdown = liveStreamCountdown > 1 ? liveStreamCountdown - 1 : 6;
+    timerText.textContent = `Stream: aktívny (${liveStreamCountdown}s)`;
   }
 }
 
-async function loadVintedListings(searchName = "all") {
+// Prepínanie kategórií pomocou pill tlačidiel
+function switchVintedCategory(categoryKey, btnEl) {
+  currentVintedCategory = categoryKey;
+  const pills = document.querySelectorAll(".pill-vinted-cat");
+  pills.forEach(p => p.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+  loadVintedListings();
+}
+
+// Zmena radenia
+function handleSortChange(sortVal) {
+  currentVintedSort = sortVal;
+  loadVintedListings();
+}
+
+// Načítanie inzerátov zo servera
+async function loadVintedListings() {
   const grid = document.getElementById("vinted-grid");
   if (!grid) return;
 
   grid.innerHTML = `
-    <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--apple-secondary);">
-      <p>⚡ Načítavam najnovšie ponuky z Vinted Snajpera...</p>
+    <div style="grid-column: 1 / -1; text-align: center; padding: 45px 20px; color: var(--apple-secondary);">
+      <p style="font-size: 24px; margin-bottom: 8px;">⚡</p>
+      <p style="font-weight: 500;">Načítavam najnovšie ponuky z Vinted Snajpera...</p>
     </div>
   `;
 
   try {
-    const res = await fetch(`/api/vinted/listings?search_name=${encodeURIComponent(searchName)}`);
-    const listings = await res.json();
+    const params = new URLSearchParams({
+      search_name: currentVintedCategory,
+      q: currentVintedQuery,
+      sort_by: currentVintedSort,
+      limit: "60"
+    });
+
+    const res = await fetch(`/api/vinted/listings?${params.toString()}`);
+    const data = await res.json();
+    const listings = data.listings || [];
 
     if (listings.length === 0) {
       grid.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--apple-secondary);">
           <p style="font-size: 32px; margin-bottom: 10px;">🔍</p>
-          <p style="font-size: 16px; font-weight: 500;">Zatiaľ žiadne inzeráty pre túto kategóriu</p>
+          <p style="font-size: 16px; font-weight: 600; color: var(--apple-text);">Nenašli sa žiadne inzeráty</p>
+          <p style="font-size: 13px; margin-top: 4px;">Skúste zmeniť kategóriu alebo hľadaný výraz.</p>
         </div>
       `;
       return;
     }
 
-    grid.innerHTML = listings.map(item => {
-      const photo = item.image_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80";
-      const isAdded = item.already_added;
+    if (listings.length > 0) {
+      latestListingId = listings[0].item_id;
+    }
 
-      return `
-        <div class="item-card vinted-card" id="vinted-card-${item.item_id}">
-          <div class="card-img-wrapper">
-            <img src="${photo}" alt="${item.title}" class="card-img" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'">
-            <span class="card-badge">⚡ ${item.search_name}</span>
-          </div>
-          <div class="card-body">
-            <h3 class="card-title" title="${item.title}">${item.title}</h3>
-            <div style="margin-bottom: 12px; font-size: 12px; color: var(--apple-secondary);">
-              Zverejnené: ${item.added_at ? item.added_at.substring(0, 16) : 'Nedávno'}
-            </div>
-            <div class="card-footer">
-              <div class="price-col">
-                <span class="price-sub">Cena na Vinted</span>
-                <span class="price-val" style="color: var(--vinted-dark);">${item.price}</span>
-              </div>
-              <div style="display: flex; gap: 8px;">
-                <a href="${item.url}" target="_blank" class="btn-card-del" title="Otvoriť na Vinted" style="display: flex; align-items: center;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                </a>
-                <button 
-                  class="btn-quick-add ${isAdded ? 'added' : ''}" 
-                  id="btn-add-${item.item_id}"
-                  onclick='handleQuickAdd(${JSON.stringify(item).replace(/'/g, "&#39;")})'
-                >
-                  ${isAdded ? '✓ V zbierke' : '★ Pridať'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join("");
+    renderVintedGrid(listings);
   } catch (err) {
     console.error("Chyba načítania inzerátov:", err);
   }
 }
 
-// KĽÚČOVÁ FUNKCIA: Automatické pridanie jedným klikom z inzerátu do zbierky
+// Vykreslenie kariet inzerátov s prehľadným oddelením funkcií
+function renderVintedGrid(listings) {
+  const grid = document.getElementById("vinted-grid");
+  if (!grid) return;
+
+  grid.innerHTML = listings.map(item => {
+    const photo = item.image_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80";
+    const isAdded = item.already_added;
+    const timeText = formatRelativeTime(item.added_at_ts);
+
+    // Bezpečný objekt pre JSON odovzdanie do QuickAdd
+    const safeItem = JSON.stringify({
+      item_id: item.item_id,
+      title: item.title,
+      price: item.numeric_price,
+      estimated_market_value: item.estimated_market_value,
+      url: item.url,
+      image_url: item.image_url,
+      search_name: item.search_name
+    }).replace(/'/g, "&#39;");
+
+    return `
+      <div class="vinted-card ${item.is_new ? 'new-item-highlight' : ''}" id="vinted-card-${item.item_id}">
+        <div class="card-img-wrapper">
+          <img src="${photo}" alt="${item.title}" class="card-img" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'">
+          
+          <!-- Živý odpočet sekúnd / minút -->
+          <span class="vinted-time-badge" data-ts="${item.added_at_ts}">
+            <span class="dot-live"></span>
+            <span class="time-text">${timeText}</span>
+          </span>
+
+          <span class="vinted-category-badge">⚡ ${item.search_name}</span>
+        </div>
+
+        <div class="card-body">
+          <h3 class="vinted-card-title" title="${item.title}">${item.title}</h3>
+          
+          <div class="vinted-price-box">
+            <span class="vinted-price-main">${item.price_formatted || item.price}</span>
+            <span class="vinted-protection-line">(${item.buyer_protection_str || 's ochranou'})</span>
+          </div>
+
+          <!-- KĽÚČOVÉ ODDELENIE: Hlavná akcia = Otvoriť na Vinted, Vedľajšia = Uložiť do zbierky -->
+          <div class="vinted-actions-row">
+            <!-- 1. HLAVNÁ VÝRAZNÁ AKCIA: Otvorenie inzerátu na trhovisku -->
+            <a href="${item.url}" target="_blank" class="btn-open-vinted">
+              <span>Otvoriť na Vinted</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+
+            <!-- 2. NENÁPADNÁ SEKUNDÁRNA AKCIA: Zaznamenať do zbierky (menej viditeľná) -->
+            <button 
+              class="btn-subtle-collect ${isAdded ? 'collected' : ''}" 
+              id="btn-collect-${item.item_id}"
+              onclick='handleQuickAdd(${safeItem})'
+              title="${isAdded ? 'Tento inzerát je už zaevidovaný vo vašej zbierke' : 'Uložiť tento predmet ako záznam do mojej zbierky'}"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="${isAdded ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span>${isAdded ? 'V zbierke' : '+ Zbierka'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+// Overovanie nových inzerátov v pozadí pre živý stream
+async function pollNewVintedListings() {
+  try {
+    const res = await fetch(`/api/vinted/listings?search_name=all&limit=5`);
+    const data = await res.json();
+    const listings = data.listings || [];
+
+    if (listings.length > 0 && latestListingId && listings[0].item_id !== latestListingId) {
+      // Objavil sa nový inzerát!
+      const newItem = listings[0];
+      latestListingId = newItem.item_id;
+
+      if (currentVintedCategory === "all" || currentVintedCategory === newItem.search_name) {
+        prependNewListing(newItem);
+        showToast(`⚡ Vinted Snajper zachytil nový inzerát: ${newItem.title.substring(0, 32)}... (${newItem.price_formatted})! Odoslané aj na Telegram.`);
+      }
+    }
+  } catch (err) {
+    // Tiché zlyhanie pri periodickom dopyte
+  }
+}
+
+// Pridanie novej karty na vrchol gridu
+function prependNewListing(item) {
+  const grid = document.getElementById("vinted-grid");
+  if (!grid) return;
+
+  item.is_new = true;
+  const photo = item.image_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80";
+  const isAdded = item.already_added;
+  const timeText = formatRelativeTime(item.added_at_ts);
+
+  const safeItem = JSON.stringify({
+    item_id: item.item_id,
+    title: item.title,
+    price: item.numeric_price,
+    estimated_market_value: item.estimated_market_value,
+    url: item.url,
+    image_url: item.image_url,
+    search_name: item.search_name
+  }).replace(/'/g, "&#39;");
+
+  const cardHtml = `
+    <div class="vinted-card new-item-highlight" id="vinted-card-${item.item_id}">
+      <div class="card-img-wrapper">
+        <img src="${photo}" alt="${item.title}" class="card-img" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'">
+        <span class="vinted-time-badge" data-ts="${item.added_at_ts}">
+          <span class="dot-live"></span>
+          <span class="time-text">${timeText}</span>
+        </span>
+        <span class="vinted-category-badge">⚡ ${item.search_name}</span>
+      </div>
+      <div class="card-body">
+        <h3 class="vinted-card-title" title="${item.title}">${item.title}</h3>
+        <div class="vinted-price-box">
+          <span class="vinted-price-main">${item.price_formatted || item.price}</span>
+          <span class="vinted-protection-line">(${item.buyer_protection_str || 's ochranou'})</span>
+        </div>
+        <div class="vinted-actions-row">
+          <a href="${item.url}" target="_blank" class="btn-open-vinted">
+            <span>Otvoriť na Vinted</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </a>
+          <button 
+            class="btn-subtle-collect ${isAdded ? 'collected' : ''}" 
+            id="btn-collect-${item.item_id}"
+            onclick='handleQuickAdd(${safeItem})'
+            title="Uložiť tento predmet ako záznam do mojej zbierky"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="${isAdded ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>${isAdded ? 'V zbierke' : '+ Zbierka'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  grid.insertAdjacentHTML("afterbegin", cardHtml);
+}
+
+// Simulácia nového úlovku bota (Demonštrácia reálneho času a Telegramu)
+async function simulateNewDeal() {
+  const btn = document.querySelector(".btn-simulate-deal");
+  if (btn) {
+    btn.style.opacity = "0.7";
+    btn.style.pointerEvents = "none";
+  }
+
+  try {
+    const res = await fetch("/api/vinted/simulate-deal", { method: "POST" });
+    const data = await res.json();
+    if (data.success && data.item) {
+      prependNewListing(data.item);
+      const tgMsg = data.telegram_sent ? "Zároveň odoslané na váš Telegram! 📲" : "Zaevidované v radare.";
+      showToast(`⚡ Bot zachytil nový inzerát: ${data.item.title.substring(0, 32)}... ${tgMsg}`);
+    } else {
+      showToast("Chyba pri simulácii", false);
+    }
+  } catch (err) {
+    console.error("Chyba simulácie:", err);
+  } finally {
+    if (btn) {
+      btn.style.opacity = "1";
+      btn.style.pointerEvents = "auto";
+    }
+  }
+}
+
+// KĽÚČOVÉ AUTOMATICKÉ PRIDÁVANIE DO ZBIERKY (Nenadradené / Sekundárne)
 async function handleQuickAdd(item) {
-  const btn = document.getElementById(`btn-add-${item.item_id}`);
-  if (btn && btn.classList.contains("added")) return;
+  const btn = document.getElementById(`btn-collect-${item.item_id}`);
+  if (btn && btn.classList.contains("collected")) return;
 
   if (btn) {
-    btn.textContent = "Pridávam...";
+    btn.innerHTML = `<span>Ukladám...</span>`;
     btn.style.opacity = "0.7";
   }
 
   try {
     const payload = {
       title: item.title,
-      price: item.numeric_price,
+      price: item.price,
       estimated_value: item.estimated_market_value,
       url: item.url,
       photo_url: item.image_url,
@@ -287,21 +535,26 @@ async function handleQuickAdd(item) {
     const data = await res.json();
     if (data.success) {
       if (btn) {
-        btn.textContent = "✓ V zbierke";
-        btn.classList.add("added");
+        btn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>V zbierke</span>
+        `;
+        btn.classList.add("collected");
         btn.style.opacity = "1";
       }
 
-      // Okamžitý prepočet v hornej lište
+      // Okamžitý prepočet v hornej lište (celková hodnota portfólia)
       updateSummaryStats(data.summary);
       showToast(data.message);
 
-      // Znovu načítame zbierku na pozadí
+      // Aktualizácia zbierky na pozadí
       const searchInput = document.getElementById("collection-search");
       fetchFilteredCollection(searchInput ? searchInput.value : "", "all");
     } else {
       if (btn) {
-        btn.textContent = "★ Pridať";
+        btn.innerHTML = `<span>+ Zbierka</span>`;
         btn.style.opacity = "1";
       }
       showToast(data.error || "Chyba pri ukladaní", false);
@@ -309,9 +562,77 @@ async function handleQuickAdd(item) {
   } catch (err) {
     console.error("Chyba Quick Add:", err);
     if (btn) {
-      btn.textContent = "★ Pridať";
+      btn.innerHTML = `<span>+ Zbierka</span>`;
       btn.style.opacity = "1";
     }
+  }
+}
+
+// ── Telegram Modal & Testovacie funkcie ─────────────────────────────────
+function openTelegramModal() {
+  const modal = document.getElementById("modal-telegram");
+  if (modal) modal.classList.add("active");
+}
+
+function closeTelegramModal() {
+  const modal = document.getElementById("modal-telegram");
+  if (modal) modal.classList.remove("active");
+}
+
+async function handleSaveTelegram(e) {
+  e.preventDefault();
+  const token = document.getElementById("tg-input-token").value.trim();
+  const chatId = document.getElementById("tg-input-chat-id").value.trim();
+
+  try {
+    const res = await fetch("/api/telegram/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: token, chat_id: chatId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast("✓ Telegram nastavenia boli úspešne uložené!");
+      const statusText = document.getElementById("tg-status-text");
+      if (statusText) {
+        statusText.innerHTML = `<span class="tg-dot active"></span> Aktívne (posiela do chatu)`;
+      }
+      closeTelegramModal();
+    } else {
+      showToast(data.error || "Chyba ukladania", false);
+    }
+  } catch (err) {
+    console.error("Chyba Telegram save:", err);
+  }
+}
+
+async function testTelegramAlert() {
+  showToast("✈️ Odosielam testovaciu notifikáciu do Telegramu...");
+  try {
+    const res = await fetch("/api/telegram/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Sony PlayStation 2 Slim (Test bota)",
+        price: 45.0,
+        url: "https://www.vinted.sk/catalog?search_text=ps2",
+        search_name: "PS2 Snajper"
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast("✓ Správa bola úspešne doručená do vášho Telegramu!");
+      const statusText = document.getElementById("tg-status-text");
+      if (statusText) {
+        statusText.innerHTML = `<span class="tg-dot active"></span> Aktívne (posiela do chatu)`;
+      }
+    } else {
+      showToast(`Telegram upozornenie: ${data.error || "Zlyhanie odoslania"}`, false);
+      openTelegramModal();
+    }
+  } catch (err) {
+    console.error("Chyba testu Telegramu:", err);
+    showToast("Chyba spojenia s Telegramom", false);
   }
 }
 

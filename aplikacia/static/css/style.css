@@ -452,40 +452,528 @@ body {
   background: rgba(231, 76, 60, 0.08);
 }
 
-/* ── Vinted Snajper Karta (Inzerát) ─────────────────────────────────────── */
-.vinted-card {
-  position: relative;
+/* ── Vinted Snajper Dashboard & Radar Hero Header ───────────────────────── */
+.sniper-hero-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(246, 251, 251, 0.95));
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--apple-border);
+  padding: 24px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
-.vinted-card .card-img-wrapper {
-  height: 220px;
+.sniper-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 280px;
 }
 
-.btn-quick-add {
+.radar-status-indicator {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.radar-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
   background: var(--vinted-teal);
-  color: #ffffff;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 10px;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.radar-dot.pulse {
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  animation: radarPulse 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+
+@keyframes radarPulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.radar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.radar-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--apple-text);
+}
+
+.badge-sniper-live {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.radar-subtitle {
   font-size: 13px;
+  color: var(--apple-secondary);
+  margin-top: 4px;
+  max-width: 520px;
+  line-height: 1.45;
+}
+
+.sniper-hero-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* Telegram Integrácia Chip */
+.telegram-status-chip {
+  background: #ffffff;
+  border: 1px solid rgba(0, 136, 204, 0.22);
+  border-radius: 14px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.tg-icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #229ed9;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tg-text-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.tg-label {
+  font-size: 11px;
   font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition);
+  color: var(--apple-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.tg-val {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--apple-text);
   display: flex;
   align-items: center;
   gap: 5px;
 }
 
-.btn-quick-add:hover {
-  background: var(--vinted-dark);
-  transform: translateY(-1px);
+.tg-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
-.btn-quick-add.added {
-  background: #eafaf1;
-  color: #27ae60;
+.tg-dot.active {
+  background: #22c55e;
+}
+
+.tg-dot.inactive {
+  background: #f59e0b;
+}
+
+.tg-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: 4px;
+}
+
+.btn-tg-pill {
+  background: rgba(34, 158, 217, 0.1);
+  color: #0088cc;
+  border: 1px solid rgba(0, 136, 204, 0.2);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-tg-pill:hover {
+  background: #229ed9;
+  color: #ffffff;
+  border-color: #229ed9;
+}
+
+.btn-tg-pill.outline {
+  background: #ffffff;
+  color: var(--apple-secondary);
+  border-color: var(--apple-border);
+}
+
+.btn-tg-pill.outline:hover {
+  background: var(--apple-bg);
+  color: var(--apple-text);
+}
+
+.btn-simulate-deal {
+  background: linear-gradient(135deg, #09b1ba, #007782);
+  color: #ffffff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(9, 177, 186, 0.25);
+  transition: var(--transition);
+}
+
+.btn-simulate-deal:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(9, 177, 186, 0.35);
+}
+
+.btn-simulate-deal:active {
+  transform: translateY(0);
+}
+
+/* ── Kategórie a Filtre Snajpera ───────────────────────────────────────── */
+.vinted-filters-bar {
+  margin-bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.category-pills-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.category-pills-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.pill-vinted-cat {
+  background: #ffffff;
+  border: 1px solid var(--apple-border);
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--apple-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.pill-vinted-cat:hover {
+  border-color: rgba(0, 0, 0, 0.2);
+  color: var(--apple-text);
+}
+
+.pill-vinted-cat.active {
+  background: var(--apple-text);
+  color: #ffffff;
+  border-color: var(--apple-text);
+}
+
+.cat-count-badge {
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.pill-vinted-cat.active .cat-count-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.vinted-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vinted-search-box {
+  max-width: 440px;
+  flex: 1;
+}
+
+.vinted-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.select-vinted-sort {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 12px;
+  border: 1px solid var(--apple-border);
+  background: #ffffff;
+  cursor: pointer;
+  color: var(--apple-text);
+  outline: none;
+}
+
+.live-stream-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.1);
+  padding: 7px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.pulse-indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: radarPulse 1.5s infinite;
+}
+
+/* ── Grid a Karty Inzerátov Vinted Snajpera ────────────────────────────── */
+.vinted-stream-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
+  gap: 22px;
+}
+
+.vinted-card {
+  background: var(--apple-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--apple-border);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.vinted-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+  border-color: rgba(9, 177, 186, 0.3);
+}
+
+.vinted-card.new-item-highlight {
+  animation: highlightGlow 2.5s ease-out;
+}
+
+@keyframes highlightGlow {
+  0% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.6); transform: scale(1.02); }
+  50% { box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3); }
+  100% { box-shadow: var(--shadow-sm); transform: scale(1); }
+}
+
+.vinted-card .card-img-wrapper {
+  height: 210px;
+  background: #f1f2f4;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Dynamický čas "pred X sekundami" */
+.vinted-time-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.74);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+.vinted-time-badge .dot-live {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulseDot 1.4s infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.vinted-category-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  color: var(--apple-text);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 8px;
+  z-index: 2;
+}
+
+.vinted-card .card-body {
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.vinted-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--apple-text);
+  margin-bottom: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: 40px;
+}
+
+.vinted-price-box {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.vinted-price-main {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--vinted-dark);
+  letter-spacing: -0.5px;
+}
+
+.vinted-protection-line {
+  font-size: 11.5px;
+  color: var(--apple-secondary);
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+/* ── KĽÚČOVÁ ZMENA: Prehľadné oddelenie akcií inzerátu ── */
+.vinted-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* HLAVNÉ VÝRAZNÉ TLAČIDLO: Otvoriť ponuku na Vinted */
+.btn-open-vinted {
+  flex: 1;
+  background: var(--vinted-teal);
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: var(--transition);
+  box-shadow: 0 2px 8px rgba(9, 177, 186, 0.2);
+}
+
+.btn-open-vinted:hover {
+  background: var(--vinted-dark);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(9, 177, 186, 0.3);
+}
+
+/* NENÁPADNÉ SEKUNDÁRNE TLAČIDLO: Pridať do zbierky ("menej viditeľné") */
+.btn-subtle-collect {
+  background: #f5f5f7;
+  color: var(--apple-secondary);
+  border: 1px solid var(--apple-border);
+  padding: 9px 11px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.btn-subtle-collect:hover {
+  background: #e8e8ed;
+  color: var(--apple-text);
+  border-color: rgba(0,0,0,0.15);
+}
+
+.btn-subtle-collect.collected {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.3);
   cursor: default;
-  pointer-events: none;
+}
+
+.btn-subtle-collect.collected:hover {
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 /* ── Modálne okná (Apple Sheet Modal) ─────────────────────────────────── */

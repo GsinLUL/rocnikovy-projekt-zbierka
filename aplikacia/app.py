@@ -11,6 +11,7 @@ from datetime import datetime
 
 import database
 import api_catalog
+import telegram_service
 
 app = Flask(__name__)
 app.secret_key = "zbierka-vinted-collector-secret-key-2026"
@@ -28,6 +29,8 @@ def index():
     summary = database.get_portfolio_summary()
     items = database.get_all_items()
     categories = sorted(list(set(item["category"] for item in items)))
+    vinted_categories = database.get_vinted_categories_with_counts()
+    telegram_creds = telegram_service.get_telegram_credentials()
 
     # Načítanie aktívnych vyhľadávaní bota
     searches = []
@@ -44,7 +47,9 @@ def index():
         summary=summary,
         items=items,
         categories=categories,
-        searches=searches
+        searches=searches,
+        vinted_categories=vinted_categories,
+        telegram_creds=telegram_creds
     )
 
 # ── API pre Zbierku (Portfólio) ──────────────────────────────────────────────────
@@ -112,10 +117,171 @@ def api_catalog_search():
 
 @app.route("/api/vinted/listings", methods=["GET"])
 def api_vinted_listings():
-    """Načíta inzeráty zachytené botom s príznakom či sú už pridané v zbierke."""
+    """Načíta inzeráty zachytené botom s podporou filtrovania, triedenia a dynamických časov."""
     search_name = request.args.get("search_name", "all")
-    listings = database.get_vinted_listings(search_name=search_name, limit=100)
-    return jsonify(listings)
+    search_query = request.args.get("q", "").strip()
+    sort_by = request.args.get("sort_by", "newest")
+    limit = int(request.args.get("limit", 60))
+
+    listings = database.get_vinted_listings(
+        search_name=search_name,
+        search_query=search_query,
+        sort_by=sort_by,
+        limit=limit
+    )
+    categories = database.get_vinted_categories_with_counts()
+    creds = telegram_service.get_telegram_credentials()
+
+    return jsonify({
+        "listings": listings,
+        "categories": categories,
+        "telegram": {
+            "is_configured": creds["is_configured"],
+            "chat_id": creds["chat_id"]
+        }
+    })
+
+# ── API pre Telegram Integráciu (Notifikácie) ────────────────────────────────────
+
+@app.route("/api/telegram/status", methods=["GET"])
+def api_telegram_status():
+    """Vráti informácie o stave prepojenia s Telegramom."""
+    creds = telegram_service.get_telegram_credentials()
+    return jsonify({
+        "is_configured": creds["is_configured"],
+        "chat_id": creds["chat_id"],
+        "token_preview": (creds["token"][:7] + "..." + creds["token"][-4:]) if creds["token"] else ""
+    })
+
+@app.route("/api/telegram/save", methods=["POST"])
+def api_telegram_save():
+    """Uloží Telegram Bot Token a Chat ID."""
+    data = request.json or {}
+    token = data.get("token", "").strip()
+    chat_id = data.get("chat_id", "").strip()
+
+    if not token or not chat_id:
+        return jsonify({"success": False, "error": "Zadajte prosím Telegram Bot Token aj Chat ID"}), 400
+
+    ok = telegram_service.save_telegram_credentials(token, chat_id)
+    if ok:
+        return jsonify({"success": True, "message": "Telegram notifikácie boli úspešne prepojené!"})
+    else:
+        return jsonify({"success": False, "error": "Chyba pri ukladaní nastavení."}), 500
+
+@app.route("/api/telegram/test", methods=["POST"])
+def api_telegram_test():
+    """Otestuje odoslanie správy do Telegram chatu s reálnym formátom inzerátu."""
+    data = request.json or {}
+    title = data.get("title", "Sony PlayStation 2 Slim (Testovacia notifikácia)")
+    price = float(data.get("price", 39.0))
+    url = data.get("url", "https://www.vinted.sk/catalog?search_text=ps2")
+    image_url = data.get("image_url", "https://images1.vinted.net/t/05_024b4_8x1hKvdQ1rDps8T1o7BqC3N9/310x430/1715423891.jpeg?s=1")
+    search_name = data.get("search_name", "PS2")
+
+    res = telegram_service.send_telegram_notification(
+        title=title,
+        price_eur=price,
+        url=url,
+        image_url=image_url,
+        search_name=search_name,
+        custom_badge="⚡ TEST Z WEBU"
+    )
+    return jsonify(res)
+
+@app.route("/api/vinted/simulate-deal", methods=["POST"])
+def api_simulate_deal():
+    """
+    Simuluje zachytenie nového inzerátu Vinted Snajperom:
+    1. Zapíše inzerát do databázy bota (vinted_bot.db) s aktuálnym časom NOW.
+    2. Ak je Telegram nakonfigurovaný, automaticky pošle správu do Telegram chatu.
+    3. Okamžite vráti položku webovej stránke pre živé zobrazenie (pred 1 sekundou).
+    """
+    import random
+    samples = [
+        {
+            "title": "Sony PlayStation 2 Slim SCPH-77004 + 2 ovládače a memory karta",
+            "price": "38,00 €",
+            "numeric_price": 38.00,
+            "search_name": "PS2",
+            "image_url": "https://images1.vinted.net/t/05_024b4_8x1hKvdQ1rDps8T1o7BqC3N9/310x430/1715423891.jpeg?s=1",
+            "url": "https://www.vinted.sk/catalog?search_text=ps2&order=newest_first"
+        },
+        {
+            "title": "Apple iPod Classic 7th Gen 160GB Space Gray TOP stav bez škrabancov",
+            "price": "65,00 €",
+            "numeric_price": 65.00,
+            "search_name": "Ipod",
+            "image_url": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80",
+            "url": "https://www.vinted.sk/catalog?search_text=ipod&order=newest_first"
+        },
+        {
+            "title": "Nintendo Game Boy Advance SP (Tribal Edition) s nabíjačkou",
+            "price": "55,00 €",
+            "numeric_price": 55.00,
+            "search_name": "Nintendo",
+            "image_url": "https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?w=600&auto=format&fit=crop&q=80",
+            "url": "https://www.vinted.sk/catalog?search_text=nintendo&order=newest_first"
+        },
+        {
+            "title": "Sony Cyber-shot DSC-W55 Retro strieborný 7.2MPx funkčný",
+            "price": "24,00 €",
+            "numeric_price": 24.00,
+            "search_name": "sony kamera",
+            "image_url": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format&fit=crop&q=80",
+            "url": "https://www.vinted.sk/catalog?search_text=sony+kamera&order=newest_first"
+        },
+        {
+            "title": "Xbox 360 Slim 250GB s bezdrôtovým gamepadom",
+            "price": "42,00 €",
+            "numeric_price": 42.00,
+            "search_name": "Xbox",
+            "image_url": "https://images.unsplash.com/photo-1605901309584-818e25960a8f?w=600&auto=format&fit=crop&q=80",
+            "url": "https://www.vinted.sk/catalog?search_text=xbox&order=newest_first"
+        }
+    ]
+    picked = random.choice(samples)
+    now_dt = datetime.utcnow()
+    item_id = str(random.randint(10150000000, 10199999999))
+    item_data = {
+        "search_name": picked["search_name"],
+        "item_id": item_id,
+        "title": picked["title"],
+        "price": picked["price"],
+        "url": picked["url"],
+        "image_url": picked["image_url"],
+        "added_at": now_dt.isoformat() + "Z"
+    }
+
+    # 1. Zápis do databázy bota
+    database.add_vinted_listing(item_data)
+
+    # 2. Odoslanie notifikácie na Telegram
+    tg_res = telegram_service.send_telegram_notification(
+        title=item_data["title"],
+        price_eur=picked["numeric_price"],
+        url=item_data["url"],
+        image_url=item_data["image_url"],
+        search_name=item_data["search_name"],
+        custom_badge="⚡ NOVÝ ÚLOVOK"
+    )
+
+    # 3. Dáta pre okamžité pridanie do živého feedu na webe
+    item_data["numeric_price"] = picked["numeric_price"]
+    item_data["buyer_protection_price"] = telegram_service.calculate_buyer_protection(picked["numeric_price"])
+    item_data["buyer_protection_str"] = f"{item_data['buyer_protection_price']:.2f}".replace('.', ',') + " €"
+    item_data["price_formatted"] = picked["price"]
+    item_data["added_at_ts"] = int(now_dt.timestamp() * 1000)
+    item_data["already_added"] = False
+    item_data["is_live_demo"] = True
+
+    return jsonify({
+        "success": True,
+        "item": item_data,
+        "telegram_sent": tg_res.get("success", False),
+        "telegram_info": tg_res,
+        "message": f"Nový inzerát '{item_data['title'][:35]}...' bol zachytený a zaevidovaný!"
+    })
 
 @app.route("/api/vinted/quick-add", methods=["POST"])
 def api_quick_add():

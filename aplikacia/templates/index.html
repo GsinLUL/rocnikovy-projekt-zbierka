@@ -155,29 +155,99 @@
       </div>
     </section>
 
-    <!-- ── ZÁLOŽKA 2: VINTED SNAJPER (KĽÚČOVÁ INTEGRÁCIA) ───────────────── -->
+    <!-- ── ZÁLOŽKA 2: VINTED SNAJPER (AUTONÓMNY BOT & TELEGRAM MONITOR) ── -->
     <section id="tab-vinted" class="tab-content">
-      <div class="toolbar">
-        <div>
-          <h2 style="font-size: 20px; font-weight: 700; letter-spacing: -0.4px;">⚡ Nájdené ponuky z Vintedu</h2>
-          <p style="font-size: 13px; color: var(--apple-secondary);">
-            Inzeráty zachytené vaším autonómnym botom. Kliknutím na <b>★ Pridať</b> sa položka ihneď zapíše do databázy a prepočíta celková hodnota zbierky.
-          </p>
+
+      <!-- Snajper Radar Header (Apple Frosted Hero Card) -->
+      <div class="sniper-hero-card">
+        <div class="sniper-hero-left">
+          <div class="radar-status-indicator">
+            <span class="radar-dot pulse"></span>
+            <div>
+              <div class="radar-title-row">
+                <span class="radar-title">Autonómny Vinted Snajper</span>
+                <span class="badge-sniper-live">Živý radar</span>
+              </div>
+              <p class="radar-subtitle">
+                Nepretržité monitorovanie Vinted.sk každých 20 – 40 s. Každý nový inzerát okamžite odosiela na Telegram a zobrazuje v tomto prehľade.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <label style="font-size: 13px; font-weight: 600; color: var(--apple-secondary);">Kategória:</label>
-          <select id="vinted-search-filter" class="form-select" style="width: auto; padding: 7px 14px; font-size: 13px;">
-            <option value="all">Všetky hľadania ({{ searches|length }})</option>
-            {% for s in searches %}
-            <option value="{{ s.name }}">{{ s.name }}</option>
-            {% endfor %}
-          </select>
+        <div class="sniper-hero-right">
+          <!-- Telegram Integrácia Status Chip -->
+          <div class="telegram-status-chip" id="telegram-status-chip">
+            <div class="tg-icon-circle">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"></path><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </div>
+            <div class="tg-text-wrap">
+              <span class="tg-label">Telegram Notifikácie</span>
+              <span class="tg-val" id="tg-status-text">
+                {% if telegram_creds.is_configured %}
+                  <span class="tg-dot active"></span> Aktívne (posiela do chatu)
+                {% else %}
+                  <span class="tg-dot inactive"></span> Pripravené na token
+                {% endif %}
+              </span>
+            </div>
+            <div class="tg-actions">
+              <button class="btn-tg-pill" onclick="testTelegramAlert()" title="Otestovať odoslanie správy do vášho Telegramu">
+                <span>✈️ Test</span>
+              </button>
+              <button class="btn-tg-pill outline" onclick="openTelegramModal()" title="Nastaviť Telegram Bot Token a Chat ID">
+                <span>⚙️</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tlačidlo pre simuláciu / živé zachytenie nového inzerátu -->
+          <button class="btn-simulate-deal" onclick="simulateNewDeal()" title="Vygeneruje a zaeviduje nový zachytený inzerát ako by ho bot práve našiel">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span>Simulovať nový úlovok</span>
+          </button>
         </div>
       </div>
 
-      <!-- Feed zachytených inzerátov -->
-      <div class="items-grid" id="vinted-grid">
+      <!-- Kategórie bota (Pill filtre s presnými počtami inzerátov) -->
+      <div class="vinted-filters-bar">
+        <div class="category-pills-scroll" id="vinted-category-pills">
+          {% for cat in vinted_categories %}
+          <button 
+            class="pill-vinted-cat {% if loop.first %}active{% endif %}" 
+            data-search="{{ cat.key }}"
+            onclick="switchVintedCategory('{{ cat.key }}', this)"
+          >
+            <span>{{ cat.name }}</span>
+            <span class="cat-count-badge">{{ cat.count }}</span>
+          </button>
+          {% endfor %}
+        </div>
+
+        <!-- Sekundárny filter a hľadanie v inzerátoch -->
+        <div class="vinted-controls-row">
+          <div class="search-box vinted-search-box">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="vinted-search-input" placeholder="Filtrovať v zachytených inzerátoch (napr. Slim, 160GB, Black)...">
+          </div>
+
+          <div class="vinted-actions-group">
+            <select id="vinted-sort-select" class="form-select select-vinted-sort" onchange="handleSortChange(this.value)">
+              <option value="newest">🕒 Najnovšie zachytené (od najnovších)</option>
+              <option value="cheapest">💶 Najlacnejšie (od najnižšej ceny)</option>
+              <option value="expensive">💎 Najdrahšie (od najvyššej ceny)</option>
+            </select>
+
+            <div class="live-stream-indicator">
+              <span class="pulse-indicator-dot"></span>
+              <span id="live-timer-text">Stream: aktívny</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid zachytených inzerátov bota -->
+      <div class="vinted-stream-grid" id="vinted-grid">
         <!-- Načíta sa dynamicky cez JavaScript z databázy bota -->
       </div>
     </section>
@@ -333,6 +403,72 @@
           </button>
           <button type="submit" class="btn-add-primary">
             ✓ Uložiť do zbierky
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── MODAL: NASTAVENIA TELEGRAMU ────────────────────────────────────── -->
+  <div class="modal-overlay" id="modal-telegram">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">📲 Nastavenia Telegram Bota</h2>
+          <p style="font-size: 13px; color: var(--apple-secondary); margin-top: 4px;">
+            Prepojenie notifikácií s botom Vinted Snajper cez Telegram Bot API.
+          </p>
+        </div>
+        <button class="btn-close" onclick="closeTelegramModal()">✕</button>
+      </div>
+
+      <form id="form-telegram-settings" onsubmit="handleSaveTelegram(event)">
+        <div class="form-group">
+          <label class="form-label">Telegram Bot Token *</label>
+          <input 
+            type="password" 
+            id="tg-input-token" 
+            class="form-input" 
+            placeholder="Napr. 7123456789:AAHq_..." 
+            value="{{ telegram_creds.token }}"
+            required
+          >
+          <span style="font-size: 12px; color: var(--apple-secondary); display: block; margin-top: 4px;">
+            Získate z oficiálneho <a href="https://t.me/BotFather" target="_blank" style="color: var(--apple-blue);">@BotFather</a> na Telegrame.
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Telegram Chat ID *</label>
+          <input 
+            type="text" 
+            id="tg-input-chat-id" 
+            class="form-input" 
+            placeholder="Napr. 123456789 alebo -100..." 
+            value="{{ telegram_creds.chat_id }}"
+            required
+          >
+          <span style="font-size: 12px; color: var(--apple-secondary); display: block; margin-top: 4px;">
+            Vaše osobné ID alebo ID kanála/skupiny (získate napr. z <a href="https://t.me/userinfobot" target="_blank" style="color: var(--apple-blue);">@userinfobot</a>).
+          </span>
+        </div>
+
+        <div style="background: var(--apple-bg); padding: 14px 16px; border-radius: 12px; margin-bottom: 20px; font-size: 13px; color: var(--apple-text);">
+          <div style="font-weight: 600; margin-bottom: 4px;">💡 Ako to funguje:</div>
+          <div style="color: var(--apple-secondary); line-height: 1.45;">
+            Pri zistení každej novej ponuky bot odošle správu s fotografiou, cenou, prepočítanou ochranou kupujúceho <code>(cena * 1.05) + 0.70 €</code> a priamym odkazom. Súčasne ponuku okamžite zobrazí tu v živom zozname.
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+          <button type="button" class="pill" onclick="closeTelegramModal()">
+            Zatvoriť
+          </button>
+          <button type="button" class="btn-tg-pill" onclick="testTelegramAlert()" style="padding: 10px 18px; border-radius: 12px;">
+            ✈️ Otestovať odoslanie
+          </button>
+          <button type="submit" class="btn-add-primary">
+            ✓ Uložiť nastavenia
           </button>
         </div>
       </form>

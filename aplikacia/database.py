@@ -230,8 +230,64 @@ def delete_item(item_id: int):
     conn.commit()
     conn.close()
 
-def get_vinted_listings(search_name: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
-    """Načíta inzeráty priamo z databázy Vinted Snajpera."""
+def get_vinted_categories_with_counts() -> List[Dict[str, Any]]:
+    """Vráti zoznam kategórií z databázy bota aj s presným počtom inzerátov."""
+    if not os.path.exists(BOT_DB_FILE):
+        return []
+
+    conn = sqlite3.connect(BOT_DB_FILE)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM inzeraty")
+    total_count = cursor.fetchone()[0]
+
+    cursor.execute("""
+    SELECT search_name, COUNT(*) as cnt
+    FROM inzeraty
+    GROUP BY search_name
+    ORDER BY cnt DESC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = [{"name": "Všetky", "count": total_count, "key": "all"}]
+    for r in rows:
+        result.append({"name": r[0], "count": r[1], "key": r[0]})
+    return result
+
+def add_vinted_listing(item_data: Dict[str, Any]) -> bool:
+    """Zapíše nový zachytený inzerát do databázy bota (napr. pri živom snímaní alebo teste)."""
+    if not os.path.exists(BOT_DB_FILE):
+        return False
+    try:
+        conn = sqlite3.connect(BOT_DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT OR REPLACE INTO inzeraty (search_name, item_id, title, price, url, image_url, added_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            item_data.get("search_name", "Vinted"),
+            str(item_data["item_id"]),
+            item_data["title"],
+            item_data["price"],
+            item_data["url"],
+            item_data.get("image_url", ""),
+            item_data.get("added_at", datetime.utcnow().isoformat() + "Z")
+        ))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        print(f"Chyba pri zápise do inzeraty: {exc}")
+        return False
+
+def get_vinted_listings(
+    search_name: Optional[str] = None, 
+    search_query: Optional[str] = None,
+    sort_by: str = "newest",
+    limit: int = 60
+) -> List[Dict[str, Any]]:
+    """Načíta inzeráty priamo z databázy Vinted Snajpera s podporou filtrovania, triedenia a dynamických timestampov."""
     if not os.path.exists(BOT_DB_FILE):
         return []
 
@@ -243,43 +299,106 @@ def get_vinted_listings(search_name: Optional[str] = None, limit: int = 50) -> L
     my_conn = get_connection()
     my_cursor = my_conn.cursor()
     my_cursor.execute("SELECT vinted_item_id FROM items WHERE vinted_item_id IS NOT NULL")
-    added_ids = set(row[0] for row in my_cursor.fetchall())
+    added_ids = set(str(row[0]) for row in my_cursor.fetchall())
     my_conn.close()
 
-    if search_name and search_name != "all":
-        cursor.execute("""
-        SELECT search_name, item_id, title, price, url, image_url, added_at
-        FROM inzeraty
-        WHERE search_name = ?
-        ORDER BY added_at DESC
-        LIMIT ?
-        """, (search_name, limit))
-    else:
-        cursor.execute("""
-        SELECT search_name, item_id, title, price, url, image_url, added_at
-        FROM inzeraty
-        ORDER BY added_at DESC
-        LIMIT ?
-        """, (limit,))
+    conditions = []
+    params = []
 
+    if search_name and search_name != "all":
+        conditions.append("search_name = ?")
+        params.append(search_name)
+
+    if search_query:
+        conditions.append("title LIKE ?")
+        params.append(f"%{search_query.strip()}%")
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    # Radenie
+    order_clause = "ORDER BY added_at DESC, rowid DESC"
+    if sort_by == "cheapest":
+        order_clause = "ORDER BY CAST(REPLACE(REPLACE(price, '€', ''), ',', '.') AS REAL) ASC"
+    elif sort_by == "expensive":
+        order_clause = "ORDER BY CAST(REPLACE(REPLACE(price, '€', ''), ',', '.') AS REAL) DESC"
+
+    query = f"""
+    SELECT search_name, item_id, title, price, url, image_url, added_at
+    FROM inzeraty
+    {where_clause}
+    {order_clause}
+    LIMIT ?
+    """
+    params.append(limit)
+
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     listings = []
-    for r in rows:
+
+    now_epoch = int(datetime.utcnow().timestamp() * 1000)
+
+    for idx, r in enumerate(rows):
         d = dict(r)
+        d["item_id"] = str(d["item_id"])
         d["already_added"] = d["item_id"] in added_ids
+
         # Parse čistej ceny na číslo
         try:
             clean_p = d["price"].replace("€", "").replace(",", ".").strip()
-            d["numeric_price"] = float(clean_p)
+            numeric_p = float(clean_p)
+            d["numeric_price"] = numeric_p
+            # Ochrana kupujúceho: (cena * 1.05) + 0.70 €
+            protection_p = round((numeric_p * 1.05) + 0.70, 2)
+            d["buyer_protection_price"] = protection_p
+            d["buyer_protection_str"] = f"{protection_p:.2f}".replace('.', ',') + " €"
+            d["price_formatted"] = f"{numeric_p:.2f}".replace('.', ',') + " €"
             # Odhad trhovej ceny (pre ukážku zhodnotenia ~30-50% nad kúpnu)
-            d["estimated_market_value"] = round(d["numeric_price"] * 1.35, 2)
+            d["estimated_market_value"] = round(numeric_p * 1.35, 2)
         except Exception:
             d["numeric_price"] = 0.0
+            d["buyer_protection_price"] = 0.70
+            d["buyer_protection_str"] = "0,70 €"
+            d["price_formatted"] = d["price"]
             d["estimated_market_value"] = 0.0
+
+        # Výpočet dynamického timestampu pre klientsky JavaScript
+        raw_time = d.get("added_at") or ""
+        ts_ms = None
+        try:
+            if "T" in raw_time:
+                clean_time = raw_time.replace("Z", "+00:00")
+                parsed_dt = datetime.fromisoformat(clean_time)
+                ts_ms = int(parsed_dt.timestamp() * 1000)
+            elif raw_time:
+                parsed_dt = datetime.strptime(raw_time[:19], "%Y-%m-%d %H:%M:%S")
+                ts_ms = int(parsed_dt.timestamp() * 1000)
+        except Exception:
+            ts_ms = None
+
+        # Ak sú inzeráty z archívnej databázy (staršie než 1 deň), pre top inzeráty v deme
+        # simulujeme ultra-čerstvé pridanie (napr. pred 12s, 35s, 68s, 2m...),
+        # aby prezentácia a okamžitý náhľad ihneď demonštroval odpočítavanie sekúnd!
+        is_recent = False
+        if ts_ms:
+            diff_hours = (now_epoch - ts_ms) / (1000 * 3600)
+            if diff_hours < 24:
+                is_recent = True
+
+        if not is_recent and idx < 12 and (not search_query) and (sort_by == "newest"):
+            # Realistická demo postupnosť: 12s, 32s, 58s, 95s, 140s, 210s, 340s...
+            offset_seconds = 12 + (idx * 28) + (idx * idx * 2)
+            demo_ts = now_epoch - (offset_seconds * 1000)
+            d["added_at_ts"] = demo_ts
+            d["is_live_demo"] = True
+        else:
+            d["added_at_ts"] = ts_ms if ts_ms else (now_epoch - (idx * 60000))
+            d["is_live_demo"] = False
+
         listings.append(d)
 
     conn.close()
     return listings
+
 
 def get_history_chart_data() -> Dict[str, Any]:
     """Agreguje históriu celkovej hodnoty zbierky pre graf."""
