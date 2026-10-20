@@ -1,0 +1,45 @@
+{
+    "settings": {
+        "bot_name": "Vinted Snajper",
+        "check_interval_min": 20,
+        "check_interval_max": 40,
+        "silent_start": true
+    },
+    "searches": [
+        {
+            "name": "PS2",
+            "url": "https://www.vinted.sk/catalog?search_text=ps2&order=newest_first",
+            "keywords": []
+        },
+        {
+            "name": "Ipod",
+            "url": "https://www.vinted.sk/catalog?search_text=ipod&order=newest_first",
+            "keywords": []
+        },
+        {
+            "name": "Nintendo",
+            "url": "https://www.vinted.sk/catalog?search_text=nintendo&order=newest_first",
+            "keywords": []
+        },
+        {
+            "name": "Xbox",
+            "url": "https://www.vinted.sk/catalog?search_text=xbox&order=newest_first",
+            "keywords": []
+        },
+        {
+            "name": "Playstation",
+            "url": "https://www.vinted.sk/catalog?search_text=playstation&order=newest_first",
+            "keywords": []
+        },
+        {
+            "name": "ps3",
+            "url": "https://www.vinted.sk/catalog?search_text=ps3&order=newest_first",
+            "keywords": []
+        },
+        {
+            "name": "sony kamera",
+            "url": "https://www.vinted.sk/catalog?search_text=sony kamera&order=newest_first",
+            "keywords": []
+        }
+    ]
+}

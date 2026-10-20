@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zbierka & Vinted Snajper – Portfólio a autonómny bot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <!-- Chart.js pre interaktívny graf vývoja cien -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Horná navigačná lišta (Apple Frosted Glass) -->
+  <header class="navbar">
+    <a href="/" class="nav-brand">
+      <div class="brand-icon">Z</div>
+      <div>
+        <span class="brand-title">Zbierka</span>
+        <span class="brand-badge">Snajper Bot</span>
+      </div>
+    </a>
+
+    <!-- Apple Segmented Control (Prepínač pohľadov) -->
+    <div class="segmented-control">
+      <button class="seg-btn active" data-tab="tab-collection">
+        <span>📦</span> Moja zbierka
+      </button>
+      <button class="seg-btn" data-tab="tab-vinted">
+        <span>⚡</span> Vinted Snajper
+      </button>
+      <button class="seg-btn" data-tab="tab-trends">
+        <span>📈</span> Cenové trendy
+      </button>
+      <button class="seg-btn" data-tab="tab-bot-settings">
+        <span>🤖</span> Správa bota
+      </button>
+    </div>
+
+    <!-- Tlačidlo pre otvorenie modalu s automatickým API dopĺňaním -->
+    <button class="btn-add-primary" id="btn-open-add-modal">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      <span>Pridať s API</span>
+    </button>
+  </header>
+
+  <!-- Hlavný obsah -->
+  <main class="container">
+
+    <!-- Horné súhrnné metriky portfólia (Apple Card Widgets) -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Celková hodnota zbierky</span>
+          <span>💎</span>
+        </div>
+        <div class="stat-value" id="stat-total-value">
+          {{ "%.2f"|format(summary.total_value)|replace('.', ',') }} €
+        </div>
+        <div class="stat-badge green" id="stat-roi-badge">
+          {% if summary.total_profit >= 0 %}+{% endif %}{{ "%.2f"|format(summary.total_profit)|replace('.', ',') }} € ({{ summary.roi_pct }} %)
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Celková kúpna cena</span>
+          <span>🛒</span>
+        </div>
+        <div class="stat-value" id="stat-total-purchase">
+          {{ "%.2f"|format(summary.total_purchase)|replace('.', ',') }} €
+        </div>
+        <div style="font-size: 12px; color: var(--apple-secondary); margin-top: 10px;">
+          Investovaný kapitál
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Evidované položky</span>
+          <span>🏷️</span>
+        </div>
+        <div class="stat-value" id="stat-total-count">
+          {{ summary.total_items }} ks
+        </div>
+        <div style="font-size: 12px; color: var(--apple-secondary); margin-top: 10px;">
+          V aktívnom portfóliu
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Stav Vinted Snajpera</span>
+          <span>⚡</span>
+        </div>
+        <div class="stat-value" style="font-size: 22px; color: var(--vinted-dark);">
+          Aktívny
+        </div>
+        <div style="font-size: 12px; color: var(--apple-secondary); margin-top: 10px;">
+          {{ searches|length }} sledovaných kategórií
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ZÁLOŽKA 1: MOJA ZBIERKA ──────────────────────────────────────── -->
+    <section id="tab-collection" class="tab-content active">
+      <div class="toolbar">
+        <div class="search-box">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="collection-search" placeholder="Hľadať v zbierke (napr. PS2, iPod, Nintendo)...">
+        </div>
+
+        <div class="filter-pills">
+          <button class="pill filter-pill active" data-category="all">Všetky</button>
+          {% for cat in categories %}
+          <button class="pill filter-pill" data-category="{{ cat }}">{{ cat }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Grid zberateľských kariet -->
+      <div class="items-grid" id="collection-grid">
+        {% for item in items %}
+        <div class="item-card" data-id="{{ item.id }}">
+          <div class="card-img-wrapper">
+            <img 
+              src="{{ item.photo_url or 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80' }}" 
+              alt="{{ item.name }}" 
+              class="card-img"
+              onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'"
+            >
+            <span class="card-badge">{{ item.category }}</span>
+            {% if item.source == 'Vinted Snajper' %}
+            <span class="card-source-badge">⚡ Vinted</span>
+            {% endif %}
+          </div>
+          <div class="card-body">
+            <h3 class="card-title" title="{{ item.name }}">{{ item.name }}</h3>
+            <p class="card-notes">{{ item.notes or ('Stav: ' ~ item.condition) }}</p>
+            <div class="card-footer">
+              <div class="price-col">
+                <span class="price-sub">Kúpna cena</span>
+                <span class="price-val">{{ "%.2f"|format(item.purchase_price)|replace('.', ',') }} €</span>
+              </div>
+              <div class="price-col" style="text-align: right;">
+                <span class="price-sub">Trhová hodnota</span>
+                <span class="price-val profit">{{ "%.2f"|format(item.estimated_value)|replace('.', ',') }} €</span>
+              </div>
+              <button class="btn-card-del" onclick="deleteItem({{ item.id }})" title="Zmazať položku">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- ── ZÁLOŽKA 2: VINTED SNAJPER (KĽÚČOVÁ INTEGRÁCIA) ───────────────── -->
+    <section id="tab-vinted" class="tab-content">
+      <div class="toolbar">
+        <div>
+          <h2 style="font-size: 20px; font-weight: 700; letter-spacing: -0.4px;">⚡ Nájdené ponuky z Vintedu</h2>
+          <p style="font-size: 13px; color: var(--apple-secondary);">
+            Inzeráty zachytené vaším autonómnym botom. Kliknutím na <b>★ Pridať</b> sa položka ihneď zapíše do databázy a prepočíta celková hodnota zbierky.
+          </p>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <label style="font-size: 13px; font-weight: 600; color: var(--apple-secondary);">Kategória:</label>
+          <select id="vinted-search-filter" class="form-select" style="width: auto; padding: 7px 14px; font-size: 13px;">
+            <option value="all">Všetky hľadania ({{ searches|length }})</option>
+            {% for s in searches %}
+            <option value="{{ s.name }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Feed zachytených inzerátov -->
+      <div class="items-grid" id="vinted-grid">
+        <!-- Načíta sa dynamicky cez JavaScript z databázy bota -->
+      </div>
+    </section>
+
+    <!-- ── ZÁLOŽKA 3: CENOVÉ TRENDY ───────────────────────────────────── -->
+    <section id="tab-trends" class="tab-content">
+      <div style="background: #fff; border-radius: var(--radius-xl); padding: 28px; border: 1px solid var(--apple-border); box-shadow: var(--shadow-sm); margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <h2 style="font-size: 19px; font-weight: 700;">Vývoj trhovej hodnoty portfólia v čase</h2>
+            <p style="font-size: 13px; color: var(--apple-secondary);">Automaticky trackovaný rast a prepočet ziskovosti.</p>
+          </div>
+          <span class="stat-badge green" style="font-size: 13px; padding: 6px 12px;">+{{ summary.roi_pct }}% Celkové zhodnotenie</span>
+        </div>
+
+        <div style="height: 340px; position: relative;">
+          <canvas id="chart-portfolio"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ZÁLOŽKA 4: SPRÁVA BOTA ──────────────────────────────────────── -->
+    <section id="tab-bot-settings" class="tab-content">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+        
+        <div style="background: #fff; border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--apple-border);">
+          <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 14px;">Aktívne hľadania bota (Vinted Snajper)</h3>
+          <p style="font-size: 13px; color: var(--apple-secondary); margin-bottom: 16px;">
+            Konfigurácia z <code>config.json</code>. Bot nepretržite kontroluje tieto kategórie.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            {% for s in searches %}
+            <div style="display: flex; align-items: center; justify-content: space-between; background: var(--apple-bg); padding: 10px 14px; border-radius: 10px;">
+              <span style="font-weight: 600; font-size: 14px;">⚡ {{ s.name }}</span>
+              <a href="{{ s.url }}" target="_blank" style="font-size: 12px; color: var(--vinted-teal); text-decoration: none; font-weight: 500;">
+                Otvoriť vyhľadávanie ↗
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div style="background: #fff; border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--apple-border);">
+          <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 14px;">Pridať nové sledovanie na Vinted</h3>
+          <p style="font-size: 13px; color: var(--apple-secondary); margin-bottom: 16px;">
+            Zadajte kľúčové slovo (napr. <i>Game Boy</i>, <i>Pokemon</i>, <i>Walkman</i>) a bot ho automaticky začne sledovať.
+          </p>
+
+          <form id="form-add-search" onsubmit="handleAddSearch(event)">
+            <div class="form-group">
+              <label class="form-label">Kľúčové slovo pre Vinted</label>
+              <input type="text" id="new-search-input" class="form-input" placeholder="Napr. Game Boy Color" required>
+            </div>
+            <button type="submit" class="btn-add-primary" style="width: 100%; justify-content: center;">
+              + Pridať do bota
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── MODAL: PRIDAŤ PREDMET S AUTOMATICKÝM API DOPĹŇANÍM ─────────────── -->
+  <div class="modal-overlay" id="modal-add-item">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Pridať predmet do zbierky</h2>
+          <p style="font-size: 13px; color: var(--apple-secondary);">
+            Napíšte názov položky a systém <b>automaticky doplní metadáta a fotografiu z verejného API</b>.
+          </p>
+        </div>
+        <button class="btn-close" id="btn-close-add-modal">✕</button>
+      </div>
+
+      <!-- Pole s automatickým vyhľadávaním v API -->
+      <form id="form-add-item">
+        <div class="form-group">
+          <label class="form-label">Názov položky (alebo kód) *</label>
+          <input 
+            type="text" 
+            name="name" 
+            id="item-name-input" 
+            class="form-input" 
+            placeholder="Začnite písať (napr. PS2, iPod, Charizard, Nintendo Switch)..." 
+            required 
+            autocomplete="off"
+          >
+        </div>
+
+        <!-- Návrhy z verejného API (Autosuggest) -->
+        <div id="api-suggest-box" class="api-suggest-box" style="display: none;">
+          <div style="font-size: 11.5px; font-weight: 700; color: var(--vinted-dark); text-transform: uppercase; margin-bottom: 6px;">
+            ✨ Nájdené zhody vo verejnom API (kliknite pre automatické vyplnenie):
+          </div>
+          <div id="api-suggest-list"></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kategória</label>
+            <select name="category" id="item-category-input" class="form-select">
+              <option value="Konzoly">Konzoly</option>
+              <option value="Retro elektronika">Retro elektronika</option>
+              <option value="Fotoaparáty">Fotoaparáty</option>
+              <option value="Kamery">Kamery</option>
+              <option value="Karty & Hry">Karty & Hry</option>
+              <option value="LEGO & Modely">LEGO & Modely</option>
+              <option value="Ostatné">Ostatné</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Stav predmetu</label>
+            <select name="condition" id="item-condition-input" class="form-select">
+              <option value="Nové (Zapečatené)">Nové (Zapečatené)</option>
+              <option value="Výborný">Výborný</option>
+              <option value="Veľmi dobrý" selected>Veľmi dobrý</option>
+              <option value="Dobrý">Dobrý</option>
+              <option value="Poškodený / Na opravu">Poškodený / Na opravu</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Vaša kúpna cena (€) *</label>
+            <input type="number" step="0.01" name="purchase_price" id="item-price-input" class="form-input" placeholder="0.00" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Odhad trhovej hodnoty (€)</label>
+            <input type="number" step="0.01" name="estimated_value" id="item-est-value-input" class="form-input" placeholder="0.00">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">URL fotografie (z API alebo vlastná)</label>
+          <input type="url" name="photo_url" id="item-photo-input" class="form-input" placeholder="https://...">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Poznámky zberateľa</label>
+          <textarea name="notes" id="item-notes-input" class="form-textarea" rows="2" placeholder="Sériové číslo, príslušenstvo, krabica, záruka..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+          <button type="button" class="pill" onclick="document.getElementById('modal-add-item').classList.remove('active')">
+            Zrušiť
+          </button>
+          <button type="submit" class="btn-add-primary">
+            ✓ Uložiť do zbierky
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script>
+    async function handleAddSearch(e) {
+      e.preventDefault();
+      const input = document.getElementById("new-search-input");
+      const name = input.value.trim();
+      if (!name) return;
+
+      try {
+        const res = await fetch("/api/bot/searches", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message);
+          input.value = "";
+          setTimeout(() => location.reload(), 800);
+        } else {
+          showToast(data.error || "Chyba pridania", false);
+        }
+      } catch (err) {
+        console.error("Chyba pridania hľadania:", err);
+      }
+    }
+  </script>
+</body>
+</html>
