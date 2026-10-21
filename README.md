@@ -28,7 +28,20 @@ python3 04_Implementacia/src/main.py
 python 04_Implementacia\src\main.py
 ```
 
-### 2. Spustenie automatizovaných testov
+### 2. Spustenie plnej webovej aplikácie s Vinted Snajperom
+Kompletné grafické rozhranie (Apple/Vinted štýl) s databázou portfólia a živým radarom:
+
+```bash
+# Na macOS / Linux:
+cd aplikacia
+./run.sh
+
+# Alternatívne priame spustenie:
+python3 aplikacia/app.py
+```
+Aplikácia sa automaticky otvorí v prehliadači na adrese **http://127.0.0.1:5001**.
+
+### 3. Spustenie automatizovaných testov
 ```bash
 # Na macOS / Linux:
 python3 05_Testovanie/test_portfolio.py

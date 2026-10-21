@@ -16,6 +16,14 @@ ENV/
 *.swp
 *.swo
 
-# Dočasné súbory
+# Dočasné súbory a databázové zámky
 *.tmp
 *.log
+*.db-wal
+*.db-shm
+
+# Tajné kľúče a heslá (Pravidlo 03 RUP metodiky)
+.env
+*.env
+.env.local
+
