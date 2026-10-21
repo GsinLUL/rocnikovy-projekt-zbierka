@@ -122,10 +122,15 @@ function renderCollectionGrid(items) {
 
   if (items.length === 0) {
     grid.innerHTML = `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--apple-secondary);">
-        <p style="font-size: 36px; margin-bottom: 10px;">📦</p>
-        <p style="font-size: 16px; font-weight: 500;">Nenašli sa žiadne položky</p>
-        <p style="font-size: 13px;">Skúste zmeniť filter alebo pridajte nový predmet.</p>
+      <div style="grid-column: 1 / -1; text-align: center; padding: 70px 20px; color: var(--apple-secondary); background: #ffffff; border-radius: 18px; border: 1px dashed rgba(0,0,0,0.12);">
+        <p style="font-size: 44px; margin-bottom: 12px;">📦</p>
+        <p style="font-size: 18px; font-weight: 600; color: var(--apple-text); margin-bottom: 6px;">Vaša zbierka je zatiaľ prázdna</p>
+        <p style="font-size: 13.5px; margin-bottom: 22px; max-width: 440px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+          Začnite budovať svoje portfólio. Kliknite na tlačidlo nižšie, vyhľadajte zberateľský kúsok vo verejných API a uložte si ho.
+        </p>
+        <button class="btn btn-primary" onclick="openAddModal()" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; font-weight: 600;">
+          <span style="font-size: 16px;">+</span> Pridať prvý predmet
+        </button>
       </div>
     `;
     return;
