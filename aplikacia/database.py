@@ -16,6 +16,8 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+import json
+
 def init_db():
     """Inicializuje tabuľky pre portfólio a predvyplní štartovacie položky ak je databáza prázdna."""
     conn = get_connection()
@@ -30,6 +32,10 @@ def init_db():
         purchase_price REAL NOT NULL,
         estimated_value REAL NOT NULL,
         photo_url TEXT,
+        photos TEXT DEFAULT '[]',
+        brand TEXT DEFAULT '',
+        release_year INTEGER DEFAULT NULL,
+        market_source TEXT DEFAULT 'PriceCharting',
         source TEXT DEFAULT 'Manuálne',
         source_url TEXT,
         vinted_item_id TEXT,
@@ -48,12 +54,24 @@ def init_db():
     );
     """)
 
+    # Migrácia: overenie či existujú novšie stĺpce (photos, brand, release_year, market_source)
+    cursor.execute("PRAGMA table_info(items)")
+    existing_cols = set(row[1] for row in cursor.fetchall())
+    if "photos" not in existing_cols:
+        cursor.execute("ALTER TABLE items ADD COLUMN photos TEXT DEFAULT '[]'")
+    if "brand" not in existing_cols:
+        cursor.execute("ALTER TABLE items ADD COLUMN brand TEXT DEFAULT ''")
+    if "release_year" not in existing_cols:
+        cursor.execute("ALTER TABLE items ADD COLUMN release_year INTEGER DEFAULT NULL")
+    if "market_source" not in existing_cols:
+        cursor.execute("ALTER TABLE items ADD COLUMN market_source TEXT DEFAULT 'PriceCharting'")
+
     # Overenie či existujú východiskové položky
     cursor.execute("SELECT COUNT(*) FROM items")
     count = cursor.fetchone()[0]
 
     if count == 0:
-        # Pridáme pekné vzorové zberateľské položky
+        # Pridáme pekné vzorové zberateľské položky s viacerými fotografiami a metadátami
         sample_items = [
             (
                 "Sony PlayStation 2 Slim (Čierna, SCPH-70004)",
@@ -61,11 +79,19 @@ def init_db():
                 "Veľmi dobrý",
                 35.00,
                 65.00,
-                "https://images1.vinted.net/t/05_024b4_8x1hKvdQ1rDps8T1o7BqC3N9/310x430/1715423891.jpeg?s=1",
+                "https://images.unsplash.com/photo-1592840496073-e53bb3298ec5?w=800&auto=format&fit=crop&q=80",
+                json.dumps([
+                    "https://images.unsplash.com/photo-1592840496073-e53bb3298ec5?w=800&auto=format&fit=crop&q=80",
+                    "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80",
+                    "https://images1.vinted.net/t/05_024b4_8x1hKvdQ1rDps8T1o7BqC3N9/310x430/1715423891.jpeg?s=1"
+                ]),
+                "Sony Interactive Entertainment",
+                2004,
+                "PriceCharting API",
                 "Vinted Snajper",
                 "https://www.vinted.sk",
                 "sample_ps2",
-                "Kúpené s 2 originálnymi DualShock ovládačmi a pamäťovou kartou."
+                "Kúpené s 2 originálnymi DualShock ovládačmi a 8MB pamäťovou kartou."
             ),
             (
                 "Apple iPod Classic 6th Gen (80GB Silver)",
@@ -73,11 +99,18 @@ def init_db():
                 "Výborný",
                 45.00,
                 110.00,
-                "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80",
+                "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&auto=format&fit=crop&q=80",
+                json.dumps([
+                    "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&auto=format&fit=crop&q=80",
+                    "https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=800&auto=format&fit=crop&q=80"
+                ]),
+                "Apple Inc.",
+                2007,
+                "RetroTech DB",
                 "Vinted Snajper",
                 "https://www.vinted.sk",
                 "sample_ipod",
-                "Nová batéria, originálny predný kryt bez škrabancov."
+                "Nová batéria, originálny predný kryt bez škrabancov, zachovalý chróm."
             ),
             (
                 "Nintendo Game Boy Color (Atomic Purple)",
@@ -85,11 +118,18 @@ def init_db():
                 "Dobrý",
                 50.00,
                 95.00,
-                "https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?w=600&auto=format&fit=crop&q=80",
+                "https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?w=800&auto=format&fit=crop&q=80",
+                json.dumps([
+                    "https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?w=800&auto=format&fit=crop&q=80",
+                    "https://images.unsplash.com/photo-1612287232202-a7e80f4f9f6e?w=800&auto=format&fit=crop&q=80"
+                ]),
+                "Nintendo",
+                1998,
+                "PriceCharting API",
                 "Manuálne",
                 "",
                 None,
-                "Originálny priehľadný fialový kryt."
+                "Originálny priehľadný fialový kryt s pôvodným krytom na batérie."
             ),
             (
                 "Sony Cyber-shot DSC-W80 Retro Digitál",
@@ -97,17 +137,24 @@ def init_db():
                 "Veľmi dobrý",
                 20.00,
                 55.00,
-                "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format&fit=crop&q=80",
+                "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80",
+                json.dumps([
+                    "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80",
+                    "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&auto=format&fit=crop&q=80"
+                ]),
+                "Sony",
+                2007,
+                "Wikipedia API",
                 "Vinted Snajper",
                 "https://www.vinted.sk",
                 "sample_sony",
-                "Funkčná batéria aj nabíjačka, retro estetika 2000s."
+                "Carl Zeiss optika, funkčná batéria aj originálna nabíjačka, retro estetika 2000s."
             )
         ]
 
         cursor.executemany("""
-        INSERT INTO items (name, category, condition, purchase_price, estimated_value, photo_url, source, source_url, vinted_item_id, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO items (name, category, condition, purchase_price, estimated_value, photo_url, photos, brand, release_year, market_source, source, source_url, vinted_item_id, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, sample_items)
 
         # Doplníme fiktívnu cenovú históriu pre graf
@@ -127,7 +174,7 @@ def init_db():
     conn.close()
 
 def get_all_items(search_query: str = "", category: str = "", sort_by: str = "newest") -> List[Dict[str, Any]]:
-    """Vráti zoznam položiek v zbierke s voliteľným filtrovaním a radením."""
+    """Vráti zoznam položiek v zbierke s voliteľným filtrovaním, radením a rozparsovanou galériou fotiek."""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -135,8 +182,8 @@ def get_all_items(search_query: str = "", category: str = "", sort_by: str = "ne
     params = []
 
     if search_query:
-        query += " AND (name LIKE ? OR notes LIKE ?)"
-        params.extend([f"%{search_query}%", f"%{search_query}%"])
+        query += " AND (name LIKE ? OR notes LIKE ? OR brand LIKE ?)"
+        params.extend([f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"])
 
     if category and category != "all":
         query += " AND category = ?"
@@ -155,7 +202,27 @@ def get_all_items(search_query: str = "", category: str = "", sort_by: str = "ne
 
     cursor.execute(query, params)
     rows = cursor.fetchall()
-    items = [dict(row) for row in rows]
+    items = []
+    for row in rows:
+        d = dict(row)
+        # Parse fotiek
+        photos_raw = d.get("photos")
+        parsed_photos = []
+        if photos_raw:
+            try:
+                parsed_photos = json.loads(photos_raw)
+            except Exception:
+                parsed_photos = []
+        if not parsed_photos and d.get("photo_url"):
+            parsed_photos = [d["photo_url"]]
+        d["photos"] = parsed_photos
+        d["photo_url"] = parsed_photos[0] if parsed_photos else d.get("photo_url", "")
+        # Výpočet zisku a zhodnotenia
+        diff = d["estimated_value"] - d["purchase_price"]
+        d["profit"] = round(diff, 2)
+        d["roi_pct"] = round((diff / d["purchase_price"] * 100), 1) if d["purchase_price"] > 0 else 0.0
+        items.append(d)
+
     conn.close()
     return items
 
@@ -188,21 +255,93 @@ def get_portfolio_summary() -> Dict[str, Any]:
         "roi_pct": roi_pct
     }
 
-def add_item_to_collection(data: Dict[str, Any]) -> int:
-    """Pridá novú položku do zbierky a zaznamená počiatočnú cenovú históriu."""
+def get_item(item_id: int) -> Optional[Dict[str, Any]]:
+    """Vráti detail jednej položky zo zbierky vrátane galérie fotografií a histórie cien."""
     conn = get_connection()
     cursor = conn.cursor()
 
+    cursor.execute("SELECT * FROM items WHERE id = ?", (item_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+
+    item = dict(row)
+    # Parse fotiek
+    photos_raw = item.get("photos")
+    parsed_photos = []
+    if photos_raw:
+        try:
+            parsed_photos = json.loads(photos_raw)
+        except Exception:
+            parsed_photos = []
+    if not parsed_photos and item.get("photo_url"):
+        parsed_photos = [item["photo_url"]]
+
+    item["photos"] = parsed_photos
+    item["photo_url"] = parsed_photos[0] if parsed_photos else item.get("photo_url", "")
+
+    # Výpočet zisku a zhodnotenia
+    diff = item["estimated_value"] - item["purchase_price"]
+    item["profit"] = round(diff, 2)
+    item["roi_pct"] = round((diff / item["purchase_price"] * 100), 1) if item["purchase_price"] > 0 else 0.0
+
+    # Cenová história konkrétneho predmetu
     cursor.execute("""
-    INSERT INTO items (name, category, condition, purchase_price, estimated_value, photo_url, source, source_url, vinted_item_id, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    SELECT record_date, price
+    FROM price_history
+    WHERE item_id = ?
+    ORDER BY record_date ASC, id ASC
+    """, (item_id,))
+    history_rows = cursor.fetchall()
+    item["history"] = [dict(h) for h in history_rows]
+
+    conn.close()
+    return item
+
+def add_item_to_collection(data: Dict[str, Any]) -> int:
+    """Pridá novú položku do zbierky s podporou viacerých fotografií a metadát z verejných API."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Spracovanie poľa fotografií
+    photos = data.get("photos", [])
+    if isinstance(photos, str):
+        try:
+            photos = json.loads(photos)
+        except Exception:
+            photos = [p.strip() for p in photos.split(",") if p.strip()]
+
+    main_photo = data.get("photo_url", "")
+    if photos and not main_photo:
+        main_photo = photos[0]
+    elif main_photo and not photos:
+        photos = [main_photo]
+
+    release_year = data.get("release_year")
+    try:
+        release_year = int(release_year) if release_year else None
+    except Exception:
+        release_year = None
+
+    cursor.execute("""
+    INSERT INTO items (
+        name, category, condition, purchase_price, estimated_value, 
+        photo_url, photos, brand, release_year, market_source, 
+        source, source_url, vinted_item_id, notes
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data["name"],
         data.get("category", "Ostatné"),
         data.get("condition", "Veľmi dobrý"),
         float(data["purchase_price"]),
         float(data.get("estimated_value", data["purchase_price"])),
-        data.get("photo_url", ""),
+        main_photo,
+        json.dumps(photos),
+        data.get("brand", ""),
+        release_year,
+        data.get("market_source", "PriceCharting"),
         data.get("source", "Manuálne"),
         data.get("source_url", ""),
         data.get("vinted_item_id", None),
@@ -220,6 +359,100 @@ def add_item_to_collection(data: Dict[str, Any]) -> int:
     conn.commit()
     conn.close()
     return new_id
+
+def update_item(item_id: int, data: Dict[str, Any]) -> bool:
+    """Upraví existujúcu položku v zbierke (vlastné zmeny cien, fotiek, stavu, popisu)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Zistíme existujúcu položku
+    cursor.execute("""
+    SELECT name, category, condition, purchase_price, estimated_value, photo_url, photos, brand, release_year, market_source, notes 
+    FROM items WHERE id = ?
+    """, (item_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False
+
+    old_name, old_cat, old_cond, old_pur, old_est, old_photo, old_photos_raw, old_brand, old_year, old_src, old_notes = row
+
+    name = data.get("name", old_name)
+    category = data.get("category", old_cat)
+    condition = data.get("condition", old_cond)
+    purchase_price = float(data.get("purchase_price", old_pur))
+    estimated_value = float(data.get("estimated_value", old_est))
+    brand = data.get("brand", old_brand or "")
+    
+    release_year = data.get("release_year", old_year)
+    try:
+        release_year = int(release_year) if release_year else None
+    except Exception:
+        release_year = None
+
+    market_source = data.get("market_source", old_src or "PriceCharting")
+    notes = data.get("notes", old_notes or "")
+
+    photos = data.get("photos")
+    if photos is not None:
+        if isinstance(photos, str):
+            try:
+                photos = json.loads(photos)
+            except Exception:
+                photos = [p.strip() for p in photos.split(",") if p.strip()]
+    else:
+        try:
+            photos = json.loads(old_photos_raw) if old_photos_raw else []
+        except Exception:
+            photos = []
+
+    main_photo = data.get("photo_url", old_photo or "")
+    if photos and not main_photo:
+        main_photo = photos[0]
+    elif main_photo and not photos:
+        photos = [main_photo]
+
+    cursor.execute("""
+    UPDATE items SET
+        name = ?,
+        category = ?,
+        condition = ?,
+        purchase_price = ?,
+        estimated_value = ?,
+        photo_url = ?,
+        photos = ?,
+        brand = ?,
+        release_year = ?,
+        market_source = ?,
+        notes = ?
+    WHERE id = ?
+    """, (
+        name,
+        category,
+        condition,
+        purchase_price,
+        estimated_value,
+        main_photo,
+        json.dumps(photos),
+        brand,
+        release_year,
+        market_source,
+        notes,
+        item_id
+    ))
+
+    # Ak sa zmenila trhová hodnota, zapíšeme nový bod do histórie
+    new_est = estimated_value
+    if abs(new_est - old_est) > 0.01:
+        today = datetime.now().strftime("%Y-%m-%d")
+        cursor.execute("""
+        INSERT INTO price_history (item_id, record_date, price)
+        VALUES (?, ?, ?)
+        """, (item_id, today, new_est))
+
+    conn.commit()
+    conn.close()
+    return True
 
 def delete_item(item_id: int):
     """Zmaže položku zo zbierky."""

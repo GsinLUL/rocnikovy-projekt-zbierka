@@ -135,16 +135,19 @@ function renderCollectionGrid(items) {
     const profit = (item.estimated_value - item.purchase_price).toFixed(2).replace('.', ',');
     const isProfit = (item.estimated_value - item.purchase_price) >= 0;
     const photo = item.photo_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80";
+    const photosCount = (item.photos && item.photos.length) || (item.photo_url ? 1 : 0);
 
     return `
-      <div class="item-card" data-id="${item.id}">
+      <div class="item-card clickable-item-card" data-id="${item.id}" onclick="openItemDetail(${item.id})">
         <div class="card-img-wrapper">
           <img src="${photo}" alt="${item.name}" class="card-img" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'">
           <span class="card-badge">${item.category}</span>
+          ${photosCount > 1 ? `<span class="card-photos-badge">📷 ${photosCount} fotky</span>` : ''}
           ${item.source === 'Vinted Snajper' ? '<span class="card-source-badge">⚡ Vinted</span>' : ''}
         </div>
         <div class="card-body">
           <h3 class="card-title" title="${item.name}">${item.name}</h3>
+          ${(item.brand || item.release_year) ? `<div class="card-brand-tag">${item.brand || ''}${item.release_year ? ' · ' + item.release_year : ''}</div>` : ''}
           <p class="card-notes">${item.notes || 'Stav: ' + item.condition}</p>
           <div class="card-footer">
             <div class="price-col">
@@ -155,9 +158,14 @@ function renderCollectionGrid(items) {
               <span class="price-sub">Trhová hodnota</span>
               <span class="price-val ${isProfit ? 'profit' : ''}">${item.estimated_value.toFixed(2).replace('.', ',')} €</span>
             </div>
-            <button class="btn-card-del" onclick="deleteItem(${item.id})" title="Zmazať položku">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </button>
+            <div class="card-actions-icons" onclick="event.stopPropagation()">
+              <button class="btn-card-del" onclick="event.stopPropagation(); openEditModal(${item.id})" title="Upraviť položku">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              </button>
+              <button class="btn-card-del" onclick="event.stopPropagation(); deleteItem(${item.id})" title="Zmazať položku">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -636,120 +644,590 @@ async function testTelegramAlert() {
   }
 }
 
-// ── 6. Modálne okná & Automatické dopĺňanie cez Verejné API ────────────────
-function initModals() {
-  const modalAdd = document.getElementById("modal-add-item");
-  const btnOpenAdd = document.getElementById("btn-open-add-modal");
-  const btnCloseAdd = document.getElementById("btn-close-add-modal");
-  const formAdd = document.getElementById("form-add-item");
+// ── 6. Správa fotografií (Multi-photo manager) ─────────────────────────────
+let addFormPhotos = [];
+let editFormPhotos = [];
 
-  if (btnOpenAdd && modalAdd) {
-    btnOpenAdd.addEventListener("click", () => modalAdd.classList.add("active"));
+function renderPhotoChips(type) {
+  const container = document.getElementById(`${type}-photo-chips`);
+  if (!container) return;
+  const list = type === "add" ? addFormPhotos : editFormPhotos;
+
+  if (list.length === 0) {
+    container.innerHTML = `<span style="font-size: 12px; color: var(--apple-secondary); font-style: italic;">Zatiaľ neboli pridané žiadne fotografie.</span>`;
+    return;
   }
-  if (btnCloseAdd && modalAdd) {
-    btnCloseAdd.addEventListener("click", () => modalAdd.classList.remove("active"));
+
+  container.innerHTML = list.map((url, idx) => `
+    <div class="photo-chip">
+      <img src="${url}" class="photo-chip-thumb" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'">
+      <span style="font-size: 11px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Fotka #${idx + 1}</span>
+      <button type="button" class="photo-chip-del" onclick="removePhotoFromForm('${type}', ${idx})" title="Odstrániť fotku">✕</button>
+    </div>
+  `).join("");
+}
+
+function addPhotoToForm(type) {
+  const input = document.getElementById(`${type}-photo-url-input`);
+  if (!input) return;
+  const url = input.value.trim();
+  if (!url) return;
+
+  if (type === "add") {
+    addFormPhotos.push(url);
+    renderPhotoChips("add");
+  } else {
+    editFormPhotos.push(url);
+    renderPhotoChips("edit");
   }
+  input.value = "";
+}
 
-  // Zatvorenie kliknutím na pozadie
-  window.addEventListener("click", (e) => {
-    if (e.target === modalAdd) modalAdd.classList.remove("active");
-  });
-
-  if (formAdd) {
-    formAdd.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const formData = new FormData(formAdd);
-      const payload = Object.fromEntries(formData.entries());
-
-      try {
-        const res = await fetch("/api/items", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast(data.message);
-          updateSummaryStats(data.summary);
-          formAdd.reset();
-          modalAdd.classList.remove("active");
-          const searchInput = document.getElementById("collection-search");
-          fetchFilteredCollection(searchInput ? searchInput.value : "", "all");
-        } else {
-          showToast(data.error || "Chyba pridania", false);
-        }
-      } catch (err) {
-        console.error("Chyba odoslania formulára:", err);
-      }
-    });
+function removePhotoFromForm(type, index) {
+  if (type === "add") {
+    addFormPhotos.splice(index, 1);
+    renderPhotoChips("add");
+  } else {
+    editFormPhotos.splice(index, 1);
+    renderPhotoChips("edit");
   }
 }
 
-// Automatické dopĺňanie z API (Autosuggest)
+// ── 7. Multi-API Filter Selector vo formulári (Add Item) ──────────────────
+let currentAddModalApiSource = "all";
+
+function setAddModalApiSource(source, btnEl) {
+  currentAddModalApiSource = source;
+  document.querySelectorAll(".pill-api").forEach(p => p.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+
+  const nameInput = document.getElementById("item-name-input");
+  if (nameInput && nameInput.value.trim().length >= 2) {
+    triggerApiAutocomplete(nameInput.value.trim());
+  }
+}
+
+// ── 8. Automatické dopĺňanie cez verejné API (Autosuggest) ────────────────
 function initApiAutocomplete() {
   const nameInput = document.getElementById("item-name-input");
-  const suggestBox = document.getElementById("api-suggest-box");
-  const suggestList = document.getElementById("api-suggest-list");
-
   let debounceTimer = null;
 
-  if (!nameInput || !suggestBox || !suggestList) return;
+  if (!nameInput) return;
 
   nameInput.addEventListener("input", () => {
     clearTimeout(debounceTimer);
     const query = nameInput.value.trim();
-
     if (query.length < 2) {
-      suggestBox.style.display = "none";
+      const suggestBox = document.getElementById("api-suggest-box");
+      if (suggestBox) suggestBox.style.display = "none";
       return;
     }
-
-    debounceTimer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/catalog/search?q=${encodeURIComponent(query)}`);
-        const matches = await res.json();
-
-        if (matches && matches.length > 0) {
-          suggestList.innerHTML = matches.slice(0, 4).map(item => `
-            <div class="api-suggest-item" onclick='applyApiSuggestion(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
-              <img src="${item.photo_url}" class="api-suggest-thumb" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'">
-              <div style="flex: 1;">
-                <div style="font-size: 13.5px; font-weight: 600; color: var(--apple-text);">${item.name}</div>
-                <div style="font-size: 12px; color: var(--apple-secondary);">${item.category} · ${item.brand || ''} · Trh: ~${item.estimated_value} €</div>
-              </div>
-              <span style="font-size: 12px; font-weight: 600; color: var(--vinted-teal);">Použiť metadáta →</span>
-            </div>
-          `).join("");
-          suggestBox.style.display = "block";
-        } else {
-          suggestBox.style.display = "none";
-        }
-      } catch (err) {
-        console.error("Chyba API hľadania:", err);
-      }
-    }, 200);
+    debounceTimer = setTimeout(() => triggerApiAutocomplete(query), 200);
   });
 }
 
-function applyApiSuggestion(item) {
-  document.getElementById("item-name-input").value = item.name;
-  document.getElementById("item-category-input").value = item.category || "Ostatné";
-  document.getElementById("item-condition-input").value = item.default_condition || "Veľmi dobrý";
-  document.getElementById("item-est-value-input").value = item.estimated_value || "";
-  document.getElementById("item-photo-input").value = item.photo_url || "";
-  document.getElementById("item-notes-input").value = item.description || "";
+async function triggerApiAutocomplete(query) {
+  const suggestBox = document.getElementById("api-suggest-box");
+  const suggestList = document.getElementById("api-suggest-list");
+  const spinner = document.getElementById("api-suggest-spinner");
+  if (!suggestBox || !suggestList) return;
 
-  // Ak nákupná cena nie je zadaná, odporučíme orientačnú
+  if (spinner) spinner.style.display = "inline";
+
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      source: currentAddModalApiSource
+    });
+    const res = await fetch(`/api/catalog/search?${params.toString()}`);
+    const matches = await res.json();
+
+    if (spinner) spinner.style.display = "none";
+
+    if (matches && matches.length > 0) {
+      suggestList.innerHTML = matches.slice(0, 5).map(item => {
+        const itemJson = JSON.stringify(item).replace(/'/g, "&#39;");
+        const thumb = item.photo_url || (item.photos && item.photos[0]) || "";
+        const badgeClass = item.source === "PriceCharting" ? "pc" : (item.source === "Pokémon TCG API" ? "poke" : (item.source === "Wikipedia" ? "wiki" : "book"));
+
+        return `
+          <div class="api-suggest-item" onclick='applyApiSuggestion(${itemJson})'>
+            <img src="${thumb}" class="api-suggest-thumb" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'">
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                <span class="api-chip-badge ${badgeClass}" style="margin: 0; font-size: 9.5px; padding: 2px 6px;">${item.source || 'API'}</span>
+                <span style="font-size: 13.5px; font-weight: 600; color: var(--apple-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</span>
+              </div>
+              <div style="font-size: 12px; color: var(--apple-secondary);">
+                ${item.category} ${item.brand ? '· ' + item.brand : ''} ${item.release_year ? '· ' + item.release_year : ''} · Trh: <b style="color: var(--apple-text);">~${item.estimated_value} €</b>
+              </div>
+            </div>
+            <span style="font-size: 12px; font-weight: 600; color: var(--vinted-teal); white-space: nowrap;">Použiť metadáta →</span>
+          </div>
+        `;
+      }).join("");
+      suggestBox.style.display = "block";
+    } else {
+      suggestBox.style.display = "none";
+    }
+  } catch (err) {
+    if (spinner) spinner.style.display = "none";
+    console.error("Chyba API hľadania:", err);
+  }
+}
+
+function applyApiSuggestion(item) {
+  document.getElementById("item-name-input").value = item.name || "";
+  if (document.getElementById("item-brand-input")) {
+    document.getElementById("item-brand-input").value = item.brand || "";
+  }
+  if (document.getElementById("item-year-input")) {
+    document.getElementById("item-year-input").value = item.release_year || "";
+  }
+  if (document.getElementById("item-category-input") && item.category) {
+    document.getElementById("item-category-input").value = item.category;
+  }
+  if (document.getElementById("item-condition-input") && item.default_condition) {
+    document.getElementById("item-condition-input").value = item.default_condition;
+  }
+  if (document.getElementById("item-est-value-input")) {
+    document.getElementById("item-est-value-input").value = item.estimated_value || "";
+  }
+  if (document.getElementById("item-market-source-input")) {
+    document.getElementById("item-market-source-input").value = item.source || "PriceCharting";
+  }
+  if (document.getElementById("item-notes-input") && item.description) {
+    document.getElementById("item-notes-input").value = item.description;
+  }
+
+  // Fotografie z API
+  addFormPhotos = [];
+  if (item.photos && Array.isArray(item.photos) && item.photos.length > 0) {
+    addFormPhotos = [...item.photos];
+  } else if (item.photo_url) {
+    addFormPhotos = [item.photo_url];
+  }
+  renderPhotoChips("add");
+
+  // Užívateľ si sám zvolí kúpnu cenu, orientačne predvyplníme alebo zameriame kurzor
   const purchaseInput = document.getElementById("item-price-input");
   if (purchaseInput && !purchaseInput.value) {
     purchaseInput.value = (item.estimated_value * 0.75).toFixed(2);
+    purchaseInput.focus();
+    purchaseInput.select();
   }
 
   const suggestBox = document.getElementById("api-suggest-box");
   if (suggestBox) suggestBox.style.display = "none";
 
-  showToast(`Metadáta a fotografia pre '${item.name}' automaticky doplnené z verejného API!`);
+  showToast(`Metadáta (${addFormPhotos.length} fotiek, špecifikácie, trhová cena) automaticky doplnené z verejného API!`);
 }
+
+// ── 9. Pridanie novej položky do zbierky ──────────────────────────────────
+async function handleAddFormSubmit(e) {
+  e.preventDefault();
+  const form = document.getElementById("form-add-item");
+  const formData = new FormData(form);
+  const payload = Object.fromEntries(formData.entries());
+
+  payload.purchase_price = parseFloat(payload.purchase_price) || 0.0;
+  payload.estimated_value = parseFloat(payload.estimated_value) || payload.purchase_price;
+  payload.release_year = payload.release_year ? parseInt(payload.release_year, 10) : null;
+  payload.photos = addFormPhotos;
+  if (addFormPhotos.length > 0) {
+    payload.photo_url = addFormPhotos[0];
+  }
+
+  try {
+    const res = await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message);
+      updateSummaryStats(data.summary);
+      form.reset();
+      addFormPhotos = [];
+      renderPhotoChips("add");
+      document.getElementById("modal-add-item").classList.remove("active");
+      const searchInput = document.getElementById("collection-search");
+      fetchFilteredCollection(searchInput ? searchInput.value : "", "all");
+    } else {
+      showToast(data.error || "Chyba pridania položky", false);
+    }
+  } catch (err) {
+    console.error("Chyba odoslania formulára:", err);
+    showToast("Zlyhalo odoslanie položky", false);
+  }
+}
+
+// ── 10. Detail položky s multi-foto galériou a finančným prehľadom ───────
+let currentItemDetail = null;
+let currentGalleryIndex = 0;
+
+async function openItemDetail(id) {
+  try {
+    const res = await fetch(`/api/items/${id}`);
+    const item = await res.json();
+    if (!item || item.error) {
+      showToast("Položka nebola nájdená", false);
+      return;
+    }
+
+    currentItemDetail = item;
+    currentGalleryIndex = 0;
+
+    // Hlavička a tagy
+    document.getElementById("detail-title").textContent = item.name;
+    document.getElementById("detail-category-badge").textContent = item.category;
+
+    const brandEl = document.getElementById("detail-brand-badge");
+    if (item.brand || item.release_year) {
+      brandEl.textContent = `${item.brand || ''}${item.release_year ? ' · ' + item.release_year : ''}`;
+      brandEl.style.display = "inline-block";
+    } else {
+      brandEl.style.display = "none";
+    }
+
+    const sourceEl = document.getElementById("detail-source-badge");
+    sourceEl.textContent = `⚡ ${item.market_source || 'PriceCharting'}`;
+
+    // Finančné ukazovatele
+    document.getElementById("detail-purchase-price").textContent = `${item.purchase_price.toFixed(2).replace('.', ',')} €`;
+    document.getElementById("detail-market-value").textContent = `${item.estimated_value.toFixed(2).replace('.', ',')} €`;
+
+    const profitVal = item.estimated_value - item.purchase_price;
+    const profitCard = document.getElementById("detail-profit-card");
+    const profitText = document.getElementById("detail-profit-val");
+    const roiChip = document.getElementById("detail-roi-chip");
+
+    const sign = profitVal >= 0 ? "+" : "";
+    profitText.textContent = `${sign}${profitVal.toFixed(2).replace('.', ',')} €`;
+
+    const roiPct = item.purchase_price > 0 ? ((profitVal / item.purchase_price) * 100) : 0;
+    roiChip.textContent = `${sign}${roiPct.toFixed(1)} %`;
+
+    if (profitVal >= 0) {
+      profitCard.className = "detail-price-card profit-card positive";
+      roiChip.className = "detail-roi-chip";
+    } else {
+      profitCard.className = "detail-price-card profit-card negative";
+      roiChip.className = "detail-roi-chip negative";
+    }
+
+    // Špecifikácie
+    document.getElementById("detail-spec-brand").textContent = item.brand || "—";
+    document.getElementById("detail-spec-year").textContent = item.release_year || "—";
+    document.getElementById("detail-spec-condition").textContent = item.condition || "Veľmi dobrý";
+    document.getElementById("detail-spec-source").textContent = item.market_source || "PriceCharting";
+    document.getElementById("detail-spec-date").textContent = item.created_at ? item.created_at.split("T")[0] : "—";
+
+    // Poznámky
+    document.getElementById("detail-notes").textContent = item.notes || "Žiadne špeciálne poznámky.";
+
+    // Galéria
+    renderDetailGallery();
+
+    // Otvorenie modálu
+    document.getElementById("modal-item-detail").classList.add("active");
+  } catch (err) {
+    console.error("Chyba načítania detailu:", err);
+    showToast("Chyba načítania detailu položky", false);
+  }
+}
+
+function closeItemDetail() {
+  const modal = document.getElementById("modal-item-detail");
+  if (modal) modal.classList.remove("active");
+}
+
+function renderDetailGallery() {
+  if (!currentItemDetail) return;
+  const photos = (currentItemDetail.photos && currentItemDetail.photos.length > 0)
+    ? currentItemDetail.photos
+    : [currentItemDetail.photo_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80"];
+
+  if (currentGalleryIndex >= photos.length) currentGalleryIndex = 0;
+  if (currentGalleryIndex < 0) currentGalleryIndex = photos.length - 1;
+
+  const mainImg = document.getElementById("detail-main-img");
+  mainImg.style.opacity = "0.4";
+  mainImg.src = photos[currentGalleryIndex];
+  setTimeout(() => { mainImg.style.opacity = "1"; }, 80);
+
+  document.getElementById("gallery-counter").textContent = `${currentGalleryIndex + 1} / ${photos.length}`;
+
+  const prevBtn = document.getElementById("btn-gallery-prev");
+  const nextBtn = document.getElementById("btn-gallery-next");
+  if (photos.length <= 1) {
+    prevBtn.style.display = "none";
+    nextBtn.style.display = "none";
+  } else {
+    prevBtn.style.display = "flex";
+    nextBtn.style.display = "flex";
+  }
+
+  // Miniatúry
+  const thumbsRow = document.getElementById("detail-thumbnails-container");
+  if (photos.length > 1) {
+    thumbsRow.style.display = "flex";
+    thumbsRow.innerHTML = photos.map((url, idx) => `
+      <img 
+        src="${url}" 
+        class="detail-thumbnail ${idx === currentGalleryIndex ? 'active' : ''}" 
+        onclick="selectGalleryPhoto(${idx})"
+        onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'"
+      >
+    `).join("");
+  } else {
+    thumbsRow.style.display = "none";
+    thumbsRow.innerHTML = "";
+  }
+}
+
+function navigateGallery(direction) {
+  if (!currentItemDetail) return;
+  const photos = (currentItemDetail.photos && currentItemDetail.photos.length > 0)
+    ? currentItemDetail.photos
+    : [currentItemDetail.photo_url];
+  currentGalleryIndex = (currentGalleryIndex + direction + photos.length) % photos.length;
+  renderDetailGallery();
+}
+
+function selectGalleryPhoto(index) {
+  currentGalleryIndex = index;
+  renderDetailGallery();
+}
+
+function openEditFromDetail() {
+  if (!currentItemDetail) return;
+  const id = currentItemDetail.id;
+  closeItemDetail();
+  openEditModal(id);
+}
+
+function deleteFromDetail() {
+  if (!currentItemDetail) return;
+  const id = currentItemDetail.id;
+  closeItemDetail();
+  deleteItem(id);
+}
+
+// ── 11. Úprava položky (Edit Item Modal) ──────────────────────────────────
+async function openEditModal(id) {
+  try {
+    const res = await fetch(`/api/items/${id}`);
+    const item = await res.json();
+    if (!item || item.error) {
+      showToast("Položka nebola nájdená", false);
+      return;
+    }
+
+    document.getElementById("edit-item-id").value = item.id;
+    document.getElementById("edit-name-input").value = item.name || "";
+    document.getElementById("edit-brand-input").value = item.brand || "";
+    document.getElementById("edit-year-input").value = item.release_year || "";
+    document.getElementById("edit-category-input").value = item.category || "Ostatné";
+    document.getElementById("edit-condition-input").value = item.condition || "Veľmi dobrý";
+    document.getElementById("edit-price-input").value = item.purchase_price || "";
+    document.getElementById("edit-est-value-input").value = item.estimated_value || "";
+    document.getElementById("edit-market-source-input").value = item.market_source || "PriceCharting";
+    document.getElementById("edit-notes-input").value = item.notes || "";
+
+    editFormPhotos = (item.photos && Array.isArray(item.photos)) ? [...item.photos] : (item.photo_url ? [item.photo_url] : []);
+    renderPhotoChips("edit");
+
+    document.getElementById("modal-edit-item").classList.add("active");
+  } catch (err) {
+    console.error("Chyba otvorenia úpravy:", err);
+    showToast("Chyba pri otváraní formulára úpravy", false);
+  }
+}
+
+function closeEditModal() {
+  const modal = document.getElementById("modal-edit-item");
+  if (modal) modal.classList.remove("active");
+}
+
+async function handleEditFormSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById("edit-item-id").value;
+  if (!id) return;
+
+  const payload = {
+    name: document.getElementById("edit-name-input").value.trim(),
+    brand: document.getElementById("edit-brand-input").value.trim(),
+    release_year: document.getElementById("edit-year-input").value ? parseInt(document.getElementById("edit-year-input").value, 10) : null,
+    category: document.getElementById("edit-category-input").value,
+    condition: document.getElementById("edit-condition-input").value,
+    purchase_price: parseFloat(document.getElementById("edit-price-input").value) || 0.0,
+    estimated_value: parseFloat(document.getElementById("edit-est-value-input").value) || 0.0,
+    market_source: document.getElementById("edit-market-source-input").value.trim(),
+    notes: document.getElementById("edit-notes-input").value.trim(),
+    photos: editFormPhotos,
+    photo_url: editFormPhotos.length > 0 ? editFormPhotos[0] : ""
+  };
+
+  try {
+    const res = await fetch(`/api/items/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast("✓ Položka bola úspešne upravená!");
+      updateSummaryStats(data.summary);
+      closeEditModal();
+      const searchInput = document.getElementById("collection-search");
+      fetchFilteredCollection(searchInput ? searchInput.value : "", "all");
+    } else {
+      showToast(data.error || "Chyba úpravy", false);
+    }
+  } catch (err) {
+    console.error("Chyba ukladania úprav:", err);
+    showToast("Zlyhala úprava položky", false);
+  }
+}
+
+// ── 12. Správa a Testovanie Verejných API (Settings Tab) ──────────────────
+async function handleSaveApiSettings() {
+  const payload = {
+    pricecharting_enabled: document.getElementById("api-toggle-pricecharting") ? document.getElementById("api-toggle-pricecharting").checked : true,
+    pokemontcg_enabled: document.getElementById("api-toggle-pokemontcg") ? document.getElementById("api-toggle-pokemontcg").checked : true,
+    wikipedia_enabled: document.getElementById("api-toggle-wikipedia") ? document.getElementById("api-toggle-wikipedia").checked : true,
+    openlibrary_enabled: document.getElementById("api-toggle-openlibrary") ? document.getElementById("api-toggle-openlibrary").checked : true,
+    pricecharting_api_key: document.getElementById("api-input-pc-key") ? document.getElementById("api-input-pc-key").value.trim() : ""
+  };
+
+  try {
+    const res = await fetch("/api/settings/apis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast("✓ Nastavenia verejných API boli úspešne uložené!");
+    } else {
+      showToast(data.error || "Chyba ukladania API nastavení", false);
+    }
+  } catch (err) {
+    console.error("Chyba API save:", err);
+    showToast("Zlyhalo uloženie nastavení API", false);
+  }
+}
+
+async function testCollectorApi(apiName, btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Testujem...";
+  }
+
+  const pingEl = document.getElementById(`ping-${apiName}`);
+
+  try {
+    const res = await fetch("/api/settings/apis/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api: apiName })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast(`✓ API ${apiName.toUpperCase()} je online a odpovedá!`);
+      if (pingEl) {
+        pingEl.className = "api-status-ping";
+        pingEl.textContent = `● Dostupné online (200 OK)`;
+      }
+    } else {
+      showToast(`API ${apiName}: ${data.error}`, false);
+      if (pingEl) {
+        pingEl.className = "api-status-ping error";
+        pingEl.textContent = `✕ Nedostupné (${data.error})`;
+      }
+    }
+  } catch (err) {
+    console.error("Chyba testu API:", err);
+    if (pingEl) {
+      pingEl.className = "api-status-ping error";
+      pingEl.textContent = "✕ Chyba spojenia";
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "⚡ Otestovať API";
+    }
+  }
+}
+
+// ── 13. Inicializácia modálnych okien & klávesové skratky ────────────────
+function initModals() {
+  const modalAdd = document.getElementById("modal-add-item");
+  const modalDetail = document.getElementById("modal-item-detail");
+  const modalEdit = document.getElementById("modal-edit-item");
+  const modalTelegram = document.getElementById("modal-telegram");
+
+  const btnOpenAdd = document.getElementById("btn-open-add-modal");
+  const btnCloseAdd = document.getElementById("btn-close-add-modal");
+
+  if (btnOpenAdd && modalAdd) {
+    btnOpenAdd.addEventListener("click", () => {
+      addFormPhotos = [];
+      renderPhotoChips("add");
+      modalAdd.classList.add("active");
+      const nameInput = document.getElementById("item-name-input");
+      if (nameInput) setTimeout(() => nameInput.focus(), 100);
+    });
+  }
+  if (btnCloseAdd && modalAdd) {
+    btnCloseAdd.addEventListener("click", () => modalAdd.classList.remove("active"));
+  }
+
+  // Zatvorenie kliknutím na overlay pozadie
+  window.addEventListener("click", (e) => {
+    if (e.target === modalAdd) modalAdd.classList.remove("active");
+    if (e.target === modalDetail) modalDetail.classList.remove("active");
+    if (e.target === modalEdit) modalEdit.classList.remove("active");
+    if (e.target === modalTelegram) modalTelegram.classList.remove("active");
+  });
+
+  // Klávesa ESC a šípky galérie
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (modalAdd) modalAdd.classList.remove("active");
+      if (modalDetail) modalDetail.classList.remove("active");
+      if (modalEdit) modalEdit.classList.remove("active");
+      if (modalTelegram) modalTelegram.classList.remove("active");
+    }
+    if (modalDetail && modalDetail.classList.contains("active")) {
+      if (e.key === "ArrowLeft") navigateGallery(-1);
+      if (e.key === "ArrowRight") navigateGallery(1);
+    }
+  });
+
+  renderPhotoChips("add");
+}
+
+// Expozícia funkcií do window pre globálny prístup z HTML
+window.openItemDetail = openItemDetail;
+window.closeItemDetail = closeItemDetail;
+window.navigateGallery = navigateGallery;
+window.selectGalleryPhoto = selectGalleryPhoto;
+window.openEditFromDetail = openEditFromDetail;
+window.deleteFromDetail = deleteFromDetail;
+window.openEditModal = openEditModal;
+window.closeEditModal = closeEditModal;
+window.handleEditFormSubmit = handleEditFormSubmit;
+window.handleAddFormSubmit = handleAddFormSubmit;
+window.setAddModalApiSource = setAddModalApiSource;
+window.applyApiSuggestion = applyApiSuggestion;
+window.addPhotoToForm = addPhotoToForm;
+window.removePhotoFromForm = removePhotoFromForm;
+window.handleSaveApiSettings = handleSaveApiSettings;
+window.testCollectorApi = testCollectorApi;
 
 // ── 7. Graf vývoja trhových cien (Chart.js) ────────────────────────────────
 let trendsChart = null;

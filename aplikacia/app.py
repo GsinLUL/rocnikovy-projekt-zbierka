@@ -31,6 +31,7 @@ def index():
     categories = sorted(list(set(item["category"] for item in items)))
     vinted_categories = database.get_vinted_categories_with_counts()
     telegram_creds = telegram_service.get_telegram_credentials()
+    api_settings = api_catalog.get_collector_api_settings()
 
     # Načítanie aktívnych vyhľadávaní bota
     searches = []
@@ -49,7 +50,8 @@ def index():
         categories=categories,
         searches=searches,
         vinted_categories=vinted_categories,
-        telegram_creds=telegram_creds
+        telegram_creds=telegram_creds,
+        api_settings=api_settings
     )
 
 # ── API pre Zbierku (Portfólio) ──────────────────────────────────────────────────
@@ -68,9 +70,17 @@ def api_portfolio():
         "summary": summary
     })
 
+@app.route("/api/items/<int:item_id>", methods=["GET"])
+def api_get_item(item_id):
+    """Vráti detail konkrétneho predmetu s galériou fotografií a cenovou históriou."""
+    item = database.get_item(item_id)
+    if not item:
+        return jsonify({"success": False, "error": "Položka neexistuje"}), 404
+    return jsonify(item)
+
 @app.route("/api/items", methods=["POST"])
 def api_add_item():
-    """Pridá novú položku do zbierky a okamžite prepočíta celkovú hodnotu."""
+    """Pridá novú položku do zbierky s podporou viacerých fotografií a okamžite prepočíta celkovú hodnotu."""
     data = request.json or request.form.to_dict()
     if not data or not data.get("name") or not data.get("purchase_price"):
         return jsonify({"success": False, "error": "Chýba názov alebo kúpna cena"}), 400
@@ -83,6 +93,27 @@ def api_add_item():
         "item_id": new_id,
         "summary": new_summary,
         "message": f"Položka '{data['name']}' bola pridaná do zbierky!"
+    })
+
+@app.route("/api/items/<int:item_id>", methods=["PUT"])
+def api_update_item(item_id):
+    """Upraví existujúcu položku (cena, stav, fotky, poznámky) a prepočíta hodnotu."""
+    data = request.json or request.form.to_dict()
+    if not data or not data.get("name") or not data.get("purchase_price"):
+        return jsonify({"success": False, "error": "Chýba názov alebo kúpna cena"}), 400
+
+    ok = database.update_item(item_id, data)
+    if not ok:
+        return jsonify({"success": False, "error": "Položka neexistuje"}), 404
+
+    updated_item = database.get_item(item_id)
+    new_summary = database.get_portfolio_summary()
+
+    return jsonify({
+        "success": True,
+        "item": updated_item,
+        "summary": new_summary,
+        "message": f"Položka '{data['name']}' bola úspešne upravená!"
     })
 
 @app.route("/api/items/<int:item_id>", methods=["DELETE"])
@@ -101,17 +132,55 @@ def api_chart():
     """Vráti dáta pre interaktívny graf vývoja trhovej hodnoty."""
     return jsonify(database.get_history_chart_data())
 
-# ── API pre verejný katalóg (Automatické dopĺňanie metadát a fotografií) ─────────
+# ── API pre verejný katalóg (Automatické dopĺňanie z PriceCharting, Pokémon, Wiki, Books) ──
 
 @app.route("/api/catalog/search", methods=["GET"])
 def api_catalog_search():
     """
-    Vyhľadávanie v katalógu: automatické dopĺňanie metadát a fotografií.
-    Eliminuje nutnosť manuálneho vypisovania údajov.
+    Vyhľadávanie vo verejných API:
+    Dopĺňa metadáta, odhadované trhové ceny a galériu fotografií.
     """
     q = request.args.get("q", "")
-    results = api_catalog.search_catalog_api(q)
+    source = request.args.get("source", "all")
+    results = api_catalog.search_catalog_api(q, source=source)
     return jsonify(results)
+
+@app.route("/api/settings/apis", methods=["GET"])
+def api_get_settings():
+    """Vráti zoznam zapnutých verejných API a konfiguráciu."""
+    return jsonify(api_catalog.get_collector_api_settings())
+
+@app.route("/api/settings/apis", methods=["POST"])
+def api_save_settings():
+    """Uloží nastavenia zapnutých verejných API."""
+    data = request.json or {}
+    ok = api_catalog.save_collector_api_settings(data)
+    if ok:
+        return jsonify({"success": True, "message": "Nastavenia verejných API boli úspešne uložené."})
+    return jsonify({"success": False, "error": "Chyba zápisu nastavení."}), 500
+
+@app.route("/api/settings/apis/test", methods=["POST"])
+def api_test_settings():
+    """Otestuje dostupnosť vybraného verejného API."""
+    data = request.json or {}
+    api_name = data.get("api_name") or data.get("api", "pricecharting")
+    
+    # Rýchly test podľa názvu API
+    try:
+        if api_name in ["pokemon", "pokemontcg"]:
+            cards = api_catalog.query_pokemon_tcg_api("pikachu", limit=1)
+            return jsonify({"success": True, "api": "Pokemon TCG API", "status": "Online (200 OK)", "count": len(cards)})
+        elif api_name == "wikipedia":
+            wiki = api_catalog.query_wikipedia_api("PlayStation", limit=1)
+            return jsonify({"success": True, "api": "Wikipedia / Wikimedia API", "status": "Online (200 OK)", "count": len(wiki)})
+        elif api_name == "openlibrary":
+            books = api_catalog.query_openlibrary_api("dune", limit=1)
+            return jsonify({"success": True, "api": "Open Library Books API", "status": "Online (200 OK)", "count": len(books)})
+        else: # pricecharting
+            items = api_catalog.search_catalog_api("PS2", source="pricecharting")
+            return jsonify({"success": True, "api": "PriceCharting Retro DB", "status": "Online & Aktívny", "count": len(items)})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
 
 # ── API pre Vinted Snajpera (Bot & Inzeráty) ─────────────────────────────────────
 

@@ -32,7 +32,7 @@
         <span>📈</span> Cenové trendy
       </button>
       <button class="seg-btn" data-tab="tab-bot-settings">
-        <span>🤖</span> Správa bota
+        <span>⚙️</span> Nastavenia & API
       </button>
     </div>
 
@@ -117,10 +117,10 @@
         </div>
       </div>
 
-      <!-- Grid zberateľských kariet -->
+      <!-- Grid zberateľských kariet (Kliknutím sa otvorí detail produktu s fotogalériou) -->
       <div class="items-grid" id="collection-grid">
         {% for item in items %}
-        <div class="item-card" data-id="{{ item.id }}">
+        <div class="item-card clickable-item-card" data-id="{{ item.id }}" onclick="openItemDetail({{ item.id }})">
           <div class="card-img-wrapper">
             <img 
               src="{{ item.photo_url or 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80' }}" 
@@ -129,12 +129,18 @@
               onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'"
             >
             <span class="card-badge">{{ item.category }}</span>
+            {% if item.photos and item.photos|length > 1 %}
+            <span class="card-photos-badge">📷 {{ item.photos|length }} fotky</span>
+            {% endif %}
             {% if item.source == 'Vinted Snajper' %}
             <span class="card-source-badge">⚡ Vinted</span>
             {% endif %}
           </div>
           <div class="card-body">
             <h3 class="card-title" title="{{ item.name }}">{{ item.name }}</h3>
+            {% if item.brand or item.release_year %}
+            <div class="card-brand-tag">{{ item.brand }}{% if item.release_year %} · {{ item.release_year }}{% endif %}</div>
+            {% endif %}
             <p class="card-notes">{{ item.notes or ('Stav: ' ~ item.condition) }}</p>
             <div class="card-footer">
               <div class="price-col">
@@ -145,9 +151,14 @@
                 <span class="price-sub">Trhová hodnota</span>
                 <span class="price-val profit">{{ "%.2f"|format(item.estimated_value)|replace('.', ',') }} €</span>
               </div>
-              <button class="btn-card-del" onclick="deleteItem({{ item.id }})" title="Zmazať položku">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              </button>
+              <div class="card-actions-icons" onclick="event.stopPropagation()">
+                <button class="btn-card-del" onclick="event.stopPropagation(); openEditModal({{ item.id }})" title="Upraviť položku">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                </button>
+                <button class="btn-card-del" onclick="event.stopPropagation(); deleteItem({{ item.id }})" title="Zmazať položku">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -269,14 +280,126 @@
       </div>
     </section>
 
-    <!-- ── ZÁLOŽKA 4: SPRÁVA BOTA ──────────────────────────────────────── -->
+    <!-- ── ZÁLOŽKA 4: NASTAVENIA & VEREJNÉ API ──────────────────────── -->
     <section id="tab-bot-settings" class="tab-content">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px;">
         
+        <!-- KARTA 1: NASTAVENIA VEREJNÝCH API PRE ZBERATEĽOV -->
+        <div style="background: #fff; border-radius: var(--radius-lg); padding: 26px; border: 1px solid var(--apple-border); box-shadow: var(--shadow-sm); grid-column: 1 / -1;">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h3 style="font-size: 19px; font-weight: 700;">🌐 Verejné API pre zberateľské dáta & trhové ceny</h3>
+                <span class="stat-badge green" style="font-size: 11px;">Automatické dopĺňanie</span>
+              </div>
+              <p style="font-size: 13px; color: var(--apple-secondary); margin-top: 4px; max-width: 750px;">
+                Systém využíva verejné API na automatické dopĺňanie fotografií, parametrov a výpočet trhových cien bez nutnosti manuálneho vypisovania. Tu si môžete zvoliť, ktoré zdroje chcete povoliť a otestovať ich spojenie.
+              </p>
+            </div>
+            <button class="btn-add-primary" onclick="handleSaveApiSettings()" style="padding: 9px 18px; font-size: 13px;">
+              ✓ Uložiť nastavenia API
+            </button>
+          </div>
+
+          <!-- Zoznam API zdrojov s prepínačmi a testovacími tlačidlami -->
+          <div class="api-settings-grid">
+            
+            <div class="api-setting-card">
+              <div class="api-card-header">
+                <div class="api-info-group">
+                  <span class="api-chip-badge pc">🎮 PriceCharting & RetroDB</span>
+                  <div class="api-name">Konzoly, retro hry a elektronika</div>
+                  <div class="api-desc">Skenuje aktuálne zberateľské trhové ceny (Loose, CIB, Mint) a galérie fotiek pre herné konzoly a retro prehrávače.</div>
+                </div>
+                <label class="apple-switch">
+                  <input type="checkbox" id="api-toggle-pricecharting" {% if api_settings.pricecharting_enabled %}checked{% endif %}>
+                  <span class="apple-slider"></span>
+                </label>
+              </div>
+              <div class="api-card-footer">
+                <button class="btn-test-api" onclick="testCollectorApi('pricecharting', this)">⚡ Otestovať API</button>
+                <span class="api-status-ping" id="ping-pricecharting">● Aktívne v systéme</span>
+              </div>
+            </div>
+
+            <div class="api-setting-card">
+              <div class="api-card-header">
+                <div class="api-info-group">
+                  <span class="api-chip-badge poke">⚡ Pokémon TCG Live API</span>
+                  <div class="api-name">Zberateľské karty (Oficiálne API)</div>
+                  <div class="api-desc">Priame prepojenie na oficiálne API kariet (api.pokemontcg.io) s trhovými cenami z Cardmarket / TCGPlayer a HD skenmi.</div>
+                </div>
+                <label class="apple-switch">
+                  <input type="checkbox" id="api-toggle-pokemontcg" {% if api_settings.pokemontcg_enabled %}checked{% endif %}>
+                  <span class="apple-slider"></span>
+                </label>
+              </div>
+              <div class="api-card-footer">
+                <button class="btn-test-api" onclick="testCollectorApi('pokemon', this)">⚡ Otestovať API</button>
+                <span class="api-status-ping" id="ping-pokemon">● Dostupné online (200 OK)</span>
+              </div>
+            </div>
+
+            <div class="api-setting-card">
+              <div class="api-card-header">
+                <div class="api-info-group">
+                  <span class="api-chip-badge wiki">📷 Wikipedia & Wikimedia API</span>
+                  <div class="api-name">Fotoaparáty, optika a vintage technika</div>
+                  <div class="api-desc">Čerpá technické parametre, históriu a slobodné fotografie z Wikimedia Commons pre vintage techniku a kamery.</div>
+                </div>
+                <label class="apple-switch">
+                  <input type="checkbox" id="api-toggle-wikipedia" {% if api_settings.wikipedia_enabled %}checked{% endif %}>
+                  <span class="apple-slider"></span>
+                </label>
+              </div>
+              <div class="api-card-footer">
+                <button class="btn-test-api" onclick="testCollectorApi('wikipedia', this)">⚡ Otestovať API</button>
+                <span class="api-status-ping" id="ping-wikipedia">● Dostupné online (200 OK)</span>
+              </div>
+            </div>
+
+            <div class="api-setting-card">
+              <div class="api-card-header">
+                <div class="api-info-group">
+                  <span class="api-chip-badge book">📚 Open Library Books API</span>
+                  <div class="api-name">Zberateľské knihy, komiksy a manga</div>
+                  <div class="api-desc">Verejné bibliografické API pre vyhľadávanie obálok vzácnych kníh a vydaní podľa ISBN a názvu.</div>
+                </div>
+                <label class="apple-switch">
+                  <input type="checkbox" id="api-toggle-openlibrary" {% if api_settings.openlibrary_enabled %}checked{% endif %}>
+                  <span class="apple-slider"></span>
+                </label>
+              </div>
+              <div class="api-card-footer">
+                <button class="btn-test-api" onclick="testCollectorApi('openlibrary', this)">⚡ Otestovať API</button>
+                <span class="api-status-ping" id="ping-openlibrary">● Dostupné online (200 OK)</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Voliteľný vlastný PriceCharting Token -->
+          <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--apple-border); display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 260px;">
+              <label class="form-label" style="margin-bottom: 2px;">Vlastný PriceCharting API Token (voliteľné pre priamy účet):</label>
+              <input type="password" id="api-input-pc-key" class="form-input" placeholder="Napr. pc_api_live_..." value="{{ api_settings.pricecharting_api_key or '' }}">
+            </div>
+            <div style="font-size: 12px; color: var(--apple-secondary); max-width: 380px;">
+              Systém obsahuje vstavaný katalóg trhových cien PriceCharting pre bežné konzoly a retro elektroniku aj bez nutnosti plateného kľúča.
+            </div>
+          </div>
+          <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+            <button type="button" class="btn-add-primary" onclick="handleSaveApiSettings()">
+              ✓ Uložiť nastavenia API
+            </button>
+          </div>
+        </div>
+
+        <!-- KARTA 2: AKTÍVNE HĽADANIA BOTA -->
         <div style="background: #fff; border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--apple-border);">
-          <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 14px;">Aktívne hľadania bota (Vinted Snajper)</h3>
+          <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 14px;">Aktívne kategórie trhoviska (Vinted Snajper)</h3>
           <p style="font-size: 13px; color: var(--apple-secondary); margin-bottom: 16px;">
-            Konfigurácia z <code>config.json</code>. Bot nepretržite kontroluje tieto kategórie.
+            Konfigurácia z <code>config.json</code>. Tieto kategórie bot nepretržite skenuje.
           </p>
 
           <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -291,10 +414,11 @@
           </div>
         </div>
 
+        <!-- KARTA 3: PRIDAŤ NOVÉ SLEDOVANIE -->
         <div style="background: #fff; border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--apple-border);">
-          <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 14px;">Pridať nové sledovanie na Vinted</h3>
+          <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 14px;">Pridať nové sledovanie na trhovisko</h3>
           <p style="font-size: 13px; color: var(--apple-secondary); margin-bottom: 16px;">
-            Zadajte kľúčové slovo (napr. <i>Game Boy</i>, <i>Pokemon</i>, <i>Walkman</i>) a bot ho automaticky začne sledovať.
+            Zadajte kľúčové slovo (napr. <i>Game Boy Color</i>, <i>Walkman</i>) a bot ho automaticky začne monitorovať.
           </p>
 
           <form id="form-add-search" onsubmit="handleAddSearch(event)">
@@ -313,29 +437,138 @@
 
   </main>
 
-  <!-- ── MODAL: PRIDAŤ PREDMET S AUTOMATICKÝM API DOPĹŇANÍM ─────────────── -->
+  <!-- ── 1. MODAL: DETAIL POLOŽKY S FOTOGALÉRIOU A METADÁTAMI ─────────── -->
+  <div class="modal-overlay" id="modal-item-detail">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-header">
+        <div class="detail-header-tags">
+          <span class="card-badge" id="detail-category-badge">Kategória</span>
+          <span class="card-brand-tag" id="detail-brand-badge" style="display: none;"></span>
+          <span class="detail-source-badge" id="detail-source-badge">⚡ PriceCharting</span>
+        </div>
+        <button class="btn-close" onclick="closeItemDetail()">✕</button>
+      </div>
+
+      <div class="detail-content-grid">
+        <!-- Vľavo: Galéria fotografií -->
+        <div class="detail-gallery-col">
+          <div class="detail-main-photo-wrapper">
+            <img id="detail-main-img" src="" alt="" class="detail-main-photo" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'">
+            <button class="gallery-nav-btn prev" id="btn-gallery-prev" onclick="navigateGallery(-1)" title="Predchádzajúca fotografia">❮</button>
+            <button class="gallery-nav-btn next" id="btn-gallery-next" onclick="navigateGallery(1)" title="Nasledujúca fotografia">❯</button>
+            <span class="gallery-counter-badge" id="gallery-counter">1 / 1</span>
+          </div>
+          <!-- Miniatúry galérie -->
+          <div class="detail-thumbnails-row" id="detail-thumbnails-container"></div>
+        </div>
+
+        <!-- Vpravo: Názov, Finančný prehľad, Metadáta a Poznámky -->
+        <div class="detail-info-col">
+          <h2 class="detail-title" id="detail-title">Názov položky</h2>
+
+          <!-- Finančné ukazovatele: Kúpna cena vs Trhová hodnota vs Nárast -->
+          <div class="detail-financial-box">
+            <div class="detail-price-card">
+              <span class="detail-price-lbl">Kúpna cena</span>
+              <span class="detail-price-num" id="detail-purchase-price">0,00 €</span>
+            </div>
+            <div class="detail-price-card highlight">
+              <span class="detail-price-lbl">Trhová hodnota</span>
+              <span class="detail-price-num" id="detail-market-value">0,00 €</span>
+            </div>
+            <div class="detail-price-card profit-card" id="detail-profit-card">
+              <span class="detail-price-lbl">Čistý zisk / Zhodnotenie</span>
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <span class="detail-price-num" id="detail-profit-val">+0,00 €</span>
+                <span class="detail-roi-chip" id="detail-roi-chip">+0.0 %</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Technické špecifikácie a parametre -->
+          <div class="detail-specs-table">
+            <div class="spec-row">
+              <span class="spec-lbl">Výrobca / Značka</span>
+              <span class="spec-val" id="detail-spec-brand">—</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-lbl">Rok vydania</span>
+              <span class="spec-val" id="detail-spec-year">—</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-lbl">Stav zachovania</span>
+              <span class="spec-val" id="detail-spec-condition">Veľmi dobrý</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-lbl">Zdroj trhovej ceny</span>
+              <span class="spec-val" id="detail-spec-source">PriceCharting API</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-lbl">Dátum zaradenia</span>
+              <span class="spec-val" id="detail-spec-date">—</span>
+            </div>
+          </div>
+
+          <!-- Poznámky zberateľa -->
+          <div class="detail-notes-box">
+            <div class="detail-notes-header">📝 Poznámky zberateľa:</div>
+            <p class="detail-notes-text" id="detail-notes">Žiadne špeciálne poznámky.</p>
+          </div>
+
+          <!-- Spodný panel akcií -->
+          <div class="detail-actions-footer">
+            <button type="button" class="btn-detail-edit" onclick="openEditFromDetail()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              <span>Upraviť položku</span>
+            </button>
+            <button type="button" class="btn-detail-delete" onclick="deleteFromDetail()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <span>Zmazať</span>
+            </button>
+            <button type="button" class="pill" onclick="closeItemDetail()" style="margin-left: auto;">
+              Zavrieť
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. MODAL: PRIDAŤ PREDMET S MULTI-API A SPRÁVOU FOTOGRAFIÍ ──────── -->
   <div class="modal-overlay" id="modal-add-item">
     <div class="modal-card">
       <div class="modal-header">
         <div>
           <h2 class="modal-title">Pridať predmet do zbierky</h2>
           <p style="font-size: 13px; color: var(--apple-secondary);">
-            Napíšte názov položky a systém <b>automaticky doplní metadáta a fotografiu z verejného API</b>.
+            Vyberte verejné API alebo začnite písať. Systém automaticky doplní fotky, trhové ceny a metadáta.
           </p>
         </div>
         <button class="btn-close" id="btn-close-add-modal">✕</button>
       </div>
 
-      <!-- Pole s automatickým vyhľadávaním v API -->
-      <form id="form-add-item">
-        <div class="form-group">
-          <label class="form-label">Názov položky (alebo kód) *</label>
+      <!-- Výber zdroja verejného API (Pills) -->
+      <div class="api-filter-pills-row">
+        <span class="api-filter-label">Zdroj API:</span>
+        <div class="api-filter-pills">
+          <button type="button" class="pill-api active" data-source="all" onclick="setAddModalApiSource('all', this)">🌐 Všetky API</button>
+          <button type="button" class="pill-api" data-source="pricecharting" onclick="setAddModalApiSource('pricecharting', this)">🎮 PriceCharting</button>
+          <button type="button" class="pill-api" data-source="pokemontcg" onclick="setAddModalApiSource('pokemontcg', this)">⚡ Pokémon TCG</button>
+          <button type="button" class="pill-api" data-source="wikipedia" onclick="setAddModalApiSource('wikipedia', this)">📷 Wikipedia & Foto</button>
+          <button type="button" class="pill-api" data-source="openlibrary" onclick="setAddModalApiSource('openlibrary', this)">📚 Knihy & Komiksy</button>
+        </div>
+      </div>
+
+      <!-- Formulár pridania položky -->
+      <form id="form-add-item" onsubmit="handleAddFormSubmit(event)">
+        <div class="form-group" style="position: relative;">
+          <label class="form-label">Názov položky (hľadať vo verejnom API) *</label>
           <input 
             type="text" 
             name="name" 
             id="item-name-input" 
             class="form-input" 
-            placeholder="Začnite písať (napr. PS2, iPod, Charizard, Nintendo Switch)..." 
+            placeholder="Začnite písať (napr. Game Boy, Charizard, Leica M3, Dune, iPod)..." 
             required 
             autocomplete="off"
           >
@@ -343,10 +576,22 @@
 
         <!-- Návrhy z verejného API (Autosuggest) -->
         <div id="api-suggest-box" class="api-suggest-box" style="display: none;">
-          <div style="font-size: 11.5px; font-weight: 700; color: var(--vinted-dark); text-transform: uppercase; margin-bottom: 6px;">
-            ✨ Nájdené zhody vo verejnom API (kliknite pre automatické vyplnenie):
+          <div class="api-suggest-header">
+            <span>✨ Nájdené zhody vo verejnom API (kliknite pre automatické vyplnenie):</span>
+            <span id="api-suggest-spinner" style="display: none; font-size: 11px; color: var(--vinted-teal);">Hľadám v API...</span>
           </div>
           <div id="api-suggest-list"></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Značka / Výrobca</label>
+            <input type="text" name="brand" id="item-brand-input" class="form-input" placeholder="Napr. Nintendo, Sony, Canon, Wizards...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Rok vydania</label>
+            <input type="number" name="release_year" id="item-year-input" class="form-input" placeholder="Napr. 1998" min="1900" max="2030">
+          </div>
         </div>
 
         <div class="form-row">
@@ -359,6 +604,7 @@
               <option value="Kamery">Kamery</option>
               <option value="Karty & Hry">Karty & Hry</option>
               <option value="LEGO & Modely">LEGO & Modely</option>
+              <option value="Knihy & Komiksy">Knihy & Komiksy</option>
               <option value="Ostatné">Ostatné</option>
             </select>
           </div>
@@ -375,26 +621,40 @@
           </div>
         </div>
 
+        <!-- Finančné údaje: Kúpna cena je prioritná -->
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Vaša kúpna cena (€) *</label>
-            <input type="number" step="0.01" name="purchase_price" id="item-price-input" class="form-input" placeholder="0.00" required>
+          <div class="form-group highlight-input-group">
+            <label class="form-label" style="color: var(--vinted-dark);">💰 Vaša kúpna cena (€) *</label>
+            <input type="number" step="0.01" name="purchase_price" id="item-price-input" class="form-input highlight-price" placeholder="0.00" required>
+            <span class="field-hint">Zadajte cenu, za ktorú ste predmet kúpili.</span>
           </div>
 
           <div class="form-group">
             <label class="form-label">Odhad trhovej hodnoty (€)</label>
             <input type="number" step="0.01" name="estimated_value" id="item-est-value-input" class="form-input" placeholder="0.00">
+            <span class="field-hint">Automaticky doplnené z vybraného trhového API.</span>
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">URL fotografie (z API alebo vlastná)</label>
-          <input type="url" name="photo_url" id="item-photo-input" class="form-input" placeholder="https://...">
+          <label class="form-label">Zdroj trhovej ceny</label>
+          <input type="text" name="market_source" id="item-market-source-input" class="form-input" placeholder="Napr. PriceCharting, Pokémon TCG API, Vlastný odhad" value="PriceCharting">
+        </div>
+
+        <!-- Správa viacerých fotografií -->
+        <div class="form-group">
+          <label class="form-label">Fotografie predmetu (viacnásobná galéria)</label>
+          <div class="photo-chips-container" id="add-photo-chips"></div>
+          <div class="photo-input-row">
+            <input type="url" id="add-photo-url-input" class="form-input" placeholder="Vložte URL novej fotografie (https://...)" autocomplete="off">
+            <button type="button" class="btn-add-photo-chip" onclick="addPhotoToForm('add')">+ Pridať fotku</button>
+          </div>
+          <span class="field-hint">Z verejných API sa automaticky načítajú dostupné fotografie. Môžete pridať aj vlastné URL.</span>
         </div>
 
         <div class="form-group">
           <label class="form-label">Poznámky zberateľa</label>
-          <textarea name="notes" id="item-notes-input" class="form-textarea" rows="2" placeholder="Sériové číslo, príslušenstvo, krabica, záruka..."></textarea>
+          <textarea name="notes" id="item-notes-input" class="form-textarea" rows="2" placeholder="Sériové číslo, kompletnosť balenia, príslušenstvo, záruka..."></textarea>
         </div>
 
         <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
@@ -403,6 +663,109 @@
           </button>
           <button type="submit" class="btn-add-primary">
             ✓ Uložiť do zbierky
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── 3. MODAL: ÚPRAVA PREDMETU (EDIT ITEM) ──────────────────────────── -->
+  <div class="modal-overlay" id="modal-edit-item">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Upraviť položku v zbierke</h2>
+          <p style="font-size: 13px; color: var(--apple-secondary);">
+            Upravte údaje, kúpnu cenu, odhad trhovej hodnoty alebo fotografie.
+          </p>
+        </div>
+        <button class="btn-close" onclick="closeEditModal()">✕</button>
+      </div>
+
+      <form id="form-edit-item" onsubmit="handleEditFormSubmit(event)">
+        <input type="hidden" id="edit-item-id" value="">
+
+        <div class="form-group">
+          <label class="form-label">Názov položky *</label>
+          <input type="text" id="edit-name-input" class="form-input" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Značka / Výrobca</label>
+            <input type="text" id="edit-brand-input" class="form-input" placeholder="Napr. Nintendo, Sony, Leica...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Rok vydania</label>
+            <input type="number" id="edit-year-input" class="form-input" placeholder="Napr. 2004">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kategória</label>
+            <select id="edit-category-input" class="form-select">
+              <option value="Konzoly">Konzoly</option>
+              <option value="Retro elektronika">Retro elektronika</option>
+              <option value="Fotoaparáty">Fotoaparáty</option>
+              <option value="Kamery">Kamery</option>
+              <option value="Karty & Hry">Karty & Hry</option>
+              <option value="LEGO & Modely">LEGO & Modely</option>
+              <option value="Knihy & Komiksy">Knihy & Komiksy</option>
+              <option value="Ostatné">Ostatné</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Stav predmetu</label>
+            <select id="edit-condition-input" class="form-select">
+              <option value="Nové (Zapečatené)">Nové (Zapečatené)</option>
+              <option value="Výborný">Výborný</option>
+              <option value="Veľmi dobrý">Veľmi dobrý</option>
+              <option value="Dobrý">Dobrý</option>
+              <option value="Poškodený / Na opravu">Poškodený / Na opravu</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group highlight-input-group">
+            <label class="form-label" style="color: var(--vinted-dark);">Vaša kúpna cena (€) *</label>
+            <input type="number" step="0.01" id="edit-price-input" class="form-input highlight-price" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Odhad trhovej hodnoty (€)</label>
+            <input type="number" step="0.01" id="edit-est-value-input" class="form-input">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Zdroj trhovej ceny</label>
+          <input type="text" id="edit-market-source-input" class="form-input" placeholder="PriceCharting, Vlastný odhad...">
+        </div>
+
+        <!-- Správa viacerých fotografií pri editácii -->
+        <div class="form-group">
+          <label class="form-label">Fotografie predmetu (viacnásobná galéria)</label>
+          <div class="photo-chips-container" id="edit-photo-chips"></div>
+          <div class="photo-input-row">
+            <input type="url" id="edit-photo-url-input" class="form-input" placeholder="Vložte URL ďalšej fotografie (https://...)" autocomplete="off">
+            <button type="button" class="btn-add-photo-chip" onclick="addPhotoToForm('edit')">+ Pridať fotku</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Poznámky zberateľa</label>
+          <textarea id="edit-notes-input" class="form-textarea" rows="2" placeholder="Podrobnosti o položke..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+          <button type="button" class="pill" onclick="closeEditModal()">
+            Zrušiť
+          </button>
+          <button type="submit" class="btn-add-primary">
+            ✓ Uložiť zmeny
           </button>
         </div>
       </form>
